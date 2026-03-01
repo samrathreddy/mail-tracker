@@ -1,0 +1,13 @@
+{
+  "name": "mail-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.72.0"
+  }
+}

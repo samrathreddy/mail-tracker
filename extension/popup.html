@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 380px;
+      min-height: 200px;
+      max-height: 560px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0c0c0c;
+      color: #e0e0e0;
+      font-size: 13px;
+      overflow-y: auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #1a1a1a;
+      position: sticky;
+      top: 0;
+      background: #0c0c0c;
+      z-index: 10;
+    }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #3b82f6; }
+    .btn-ghost {
+      background: transparent;
+      color: #888;
+      padding: 6px 8px;
+    }
+    .btn-ghost:hover { color: #fff; background: #1a1a1a; }
+    .btn-danger {
+      background: transparent;
+      color: #666;
+      padding: 4px 6px;
+      font-size: 11px;
+    }
+    .btn-danger:hover { color: #ef4444; }
+
+    /* Setup screen */
+    .setup {
+      padding: 32px 20px;
+      text-align: center;
+    }
+    .setup p {
+      color: #888;
+      margin: 8px 0 20px;
+      line-height: 1.5;
+    }
+    .setup input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .setup input:focus { border-color: #2563eb; }
+    .setup .btn { width: 100%; padding: 10px; }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-top: 1px solid #1a1a1a;
+      margin-top: 16px;
+    }
+    .toggle-row label {
+      font-size: 13px;
+      color: #ccc;
+    }
+    .toggle-row .sub {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
+    }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { display: none; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: #333;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .slider { background: #2563eb; }
+    .toggle input:checked + .slider::before { transform: translateX(18px); }
+    .detail-recipient {
+      padding: 0 16px 8px;
+      font-size: 12px;
+      color: #60a5fa;
+    }
+
+    /* Pixel list */
+    .pixel-list {
+      padding: 4px 0;
+    }
+    .pixel-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid #141414;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .pixel-item:hover { background: #141414; }
+    .pixel-info { flex: 1; min-width: 0; }
+    .pixel-id {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: #fff;
+      font-weight: 500;
+    }
+    .pixel-meta {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
+    }
+    .pixel-recipient {
+      font-size: 12px;
+      color: #60a5fa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pixel-opens {
+      font-size: 18px;
+      font-weight: 700;
+      color: #34d399;
+      margin-right: 12px;
+      min-width: 28px;
+      text-align: right;
+    }
+    .pixel-actions {
+      display: flex;
+      gap: 2px;
+      margin-left: 8px;
+    }
+
+    /* Detail view */
+    .detail {
+      display: none;
+    }
+    .detail.active { display: block; }
+    .detail-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #1a1a1a;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      background: #0c0c0c;
+      z-index: 10;
+    }
+    .detail-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      flex: 1;
+      font-family: monospace;
+    }
+    .stat-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+    .stat-card .value.orange { color: #fb923c; }
+    .stat-card .value.blue { color: #60a5fa; }
+    .stat-card {
+      background: #141414;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .stat-card label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #555;
+      letter-spacing: 0.5px;
+    }
+    .stat-card .value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 4px;
+    }
+    .stat-card .value.green { color: #34d399; }
+
+    /* Snippet box */
+    .snippet-section {
+      padding: 8px 16px 12px;
+    }
+    .snippet-label {
+      font-size: 11px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .snippet-box {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #a0a0a0;
+      word-break: break-all;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s;
+    }
+    .snippet-box:hover { border-color: #2563eb; }
+    .snippet-box .copy-hint {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: #444;
+      font-family: -apple-system, sans-serif;
+    }
+
+    /* Events list */
+    .events-section {
+      padding: 0 16px 16px;
+    }
+    .events-section h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #555;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .event-item {
+      background: #141414;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .event-item .event-time {
+      color: #60a5fa;
+      font-weight: 500;
+    }
+    .event-item .event-detail {
+      color: #555;
+      margin-top: 2px;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #444;
+    }
+    .empty p { margin-top: 8px; font-size: 12px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: #2563eb;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: transform 0.2s ease;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #444;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #222;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin: 0 auto 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main List View -->
+  <div id="list-view">
+    <div class="header">
+      <h1>&#9679; Mail Tracker</h1>
+      <div class="header-actions">
+        <button class="btn btn-ghost" id="settings-btn" title="Settings">&#9881;</button>
+        <button class="btn btn-primary" id="new-btn">+ Manual</button>
+      </div>
+    </div>
+    <div id="pixel-container">
+      <div class="loading"><div class="spinner"></div>Loading...</div>
+    </div>
+  </div>
+
+  <!-- Detail View -->
+  <div id="detail-view" class="detail">
+    <div class="detail-header">
+      <button class="btn btn-ghost" id="back-btn">&#8592;</button>
+      <h2 id="detail-id"></h2>
+      <button class="btn btn-danger" id="delete-btn" title="Delete tracker">&#128465;</button>
+    </div>
+    <div class="detail-recipient" id="detail-recipient"></div>
+    <div class="stat-cards">
+      <div class="stat-card">
+        <label>Real Opens</label>
+        <div class="value green" id="detail-opens">0</div>
+      </div>
+      <div class="stat-card">
+        <label>Last Open</label>
+        <div class="value" id="detail-last" style="font-size:13px;">—</div>
+      </div>
+      <div class="stat-card">
+        <label>Filtered</label>
+        <div class="value orange" id="detail-skipped">0</div>
+      </div>
+      <div class="stat-card">
+        <label>Sender Protection</label>
+        <div class="value blue" id="detail-protection" style="font-size:13px;">—</div>
+      </div>
+    </div>
+    <div class="snippet-section">
+      <div class="snippet-label">HTML Snippet (click to copy)</div>
+      <div class="snippet-box" id="snippet-html">
+        <span class="copy-hint">click to copy</span>
+      </div>
+    </div>
+    <div class="snippet-section">
+      <div class="snippet-label">Tracking URL (click to copy)</div>
+      <div class="snippet-box" id="snippet-url">
+        <span class="copy-hint">click to copy</span>
+      </div>
+    </div>
+    <div class="events-section">
+      <h3>Recent Events</h3>
+      <div id="events-list"></div>
+    </div>
+  </div>
+
+  <!-- Setup View -->
+  <div id="setup-view" style="display:none;">
+    <div class="header">
+      <h1>&#9881; Settings</h1>
+      <button class="btn btn-ghost" id="setup-back-btn">&#8592;</button>
+    </div>
+    <div class="setup">
+      <p>Enter your Mail Tracker server URL (your Cloudflare Worker URL)</p>
+      <input type="url" id="server-input" placeholder="https://mail-tracker.yourname.workers.dev" />
+      <button class="btn btn-primary" id="save-btn">Save & Connect</button>
+      <p id="setup-error" style="color:#ef4444;margin-top:12px;display:none;"></p>
+      <div class="toggle-row">
+        <div>
+          <label>Auto-track Gmail</label>
+          <div class="sub">Auto-track when you Send in Gmail</div>
+        </div>
+        <div class="toggle">
+          <input type="checkbox" id="auto-track-toggle" checked />
+          <span class="slider"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

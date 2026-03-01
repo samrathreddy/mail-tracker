@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Mail Tracker",
+  "description": "Track email opens in Gmail. Auto-injects invisible tracking pixel per recipient on Send.",
+  "version": "1.1.0",
+  "permissions": ["storage", "notifications", "alarms"],
+  "host_permissions": ["*://*/"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["gmail.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
