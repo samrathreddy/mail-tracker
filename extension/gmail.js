@@ -89,56 +89,7 @@
     return null;
   }
 
-  // Find the recipient chip element in the compose form for a given email
-  function findRecipientChip(form, email) {
-    const selectors = [
-      `span[email="${email}" i]`,
-      `[data-hovercard-id="${email}" i]`,
-      `[email="${email}" i]`
-    ];
-    for (const sel of selectors) {
-      try {
-        const el = form.querySelector(sel);
-        if (el) return el;
-      } catch (_) { /* skip invalid selectors */ }
-    }
-    return null;
-  }
 
-  // Create an SVG checkmark icon using DOM APIs (no innerHTML)
-  function createCheckSvg() {
-    const SVG_NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 12 12');
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', 'M2.5 6.5l2.5 2.5 5-5');
-    svg.appendChild(path);
-    return svg;
-  }
-
-  // Add a small tracking badge next to a recipient chip
-  function addRecipientBadge(chip) {
-    if (!chip || chip.querySelector('.mt-badge')) return;
-    // Also check sibling
-    if (chip.nextElementSibling && chip.nextElementSibling.classList.contains('mt-badge')) return;
-
-    const badge = document.createElement('span');
-    badge.className = 'mt-badge';
-    badge.title = 'Tracking pixel attached';
-    badge.appendChild(createCheckSvg());
-    const label = document.createElement('span');
-    label.textContent = 'Tracked';
-    badge.appendChild(label);
-
-    const parent = chip.parentElement;
-    if (parent) {
-      if (chip.nextSibling) {
-        parent.insertBefore(badge, chip.nextSibling);
-      } else {
-        parent.appendChild(badge);
-      }
-    }
-  }
 
   // Find the compose window's top-level container (the floating dialog box)
   function findComposeWindow(bodyEl) {
@@ -227,12 +178,6 @@
         bodyEl.appendChild(img);
         injectedCount++;
         console.log(LOG, 'Injected tracker for', recipient, '- id:', data.id);
-
-        // Add badge next to recipient chip
-        if (form) {
-          const chip = findRecipientChip(form, recipient);
-          addRecipientBadge(chip);
-        }
       } catch (e) {
         console.warn(LOG, 'Error creating tracker for', recipient, e.message);
       }
