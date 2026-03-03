@@ -1,5 +1,6 @@
 // --- State ---
 let serverUrl = '';
+let dashboardPassword = '';
 let currentPixelId = null;
 
 // --- DOM refs ---
@@ -18,8 +19,9 @@ function esc(str) {
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', async () => {
-  const { serverUrl: saved } = await chrome.storage.sync.get('serverUrl');
+  const { serverUrl: saved, dashboardPassword: savedPass } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword']);
   serverUrl = saved || '';
+  dashboardPassword = savedPass || '';
 
   if (!serverUrl) {
     showSetup(true);
@@ -57,7 +59,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- API helpers ---
 async function api(path) {
-  const res = await fetch(`${serverUrl}${path}`);
+  const headers = {};
+  if (dashboardPassword) {
+    headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+  }
+  const res = await fetch(`${serverUrl}${path}`, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -69,6 +75,7 @@ function showSetup(isFirst) {
   detailView.classList.remove('active');
   document.getElementById('setup-back-btn').style.display = isFirst ? 'none' : 'block';
   document.getElementById('server-input').value = serverUrl;
+  document.getElementById('password-input').value = dashboardPassword;
 }
 
 function showList() {
@@ -274,6 +281,7 @@ async function deleteCurrentPixel() {
 
 async function saveSettings() {
   const input = document.getElementById('server-input').value.trim().replace(/\/$/, '');
+  const passwordInput = document.getElementById('password-input').value.trim();
   const errorEl = document.getElementById('setup-error');
 
   if (!input) {
@@ -289,7 +297,11 @@ async function saveSettings() {
   errorEl.style.color = '#888';
 
   try {
-    const res = await fetch(`${input}/list`);
+    const headers = {};
+    if (passwordInput) {
+      headers['Authorization'] = 'Basic ' + btoa(':' + passwordInput);
+    }
+    const res = await fetch(`${input}/list`, { headers });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     await res.json();
   } catch (err) {
@@ -299,7 +311,8 @@ async function saveSettings() {
   }
 
   serverUrl = input;
-  await chrome.storage.sync.set({ serverUrl: input });
+  dashboardPassword = passwordInput;
+  await chrome.storage.sync.set({ serverUrl: input, dashboardPassword: passwordInput });
   errorEl.style.display = 'none';
   showToast('Connected!');
 

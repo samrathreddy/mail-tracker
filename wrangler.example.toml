@@ -7,3 +7,8 @@ binding = "TRACKER"
 id = "your-kv-namespace-id-here"  # Replace with your actual KV namespace ID
 # Run: pnpm exec wrangler kv namespace create "TRACKER"
 # Then paste the id from the output here
+
+# Optional: Set a password to protect your dashboard and API
+# Uncomment and set your password, or use wrangler secret for production
+# [vars]
+# DASHBOARD_PASSWORD = "your-secure-password"

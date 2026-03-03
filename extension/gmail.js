@@ -6,17 +6,20 @@
 (function () {
   const LOG = '[MailTracker]';
   let serverUrl = '';
+  let dashboardPassword = '';
   let trackingEnabled = true;
 
   // Load settings
-  chrome.storage.sync.get(['serverUrl', 'autoTrack'], (result) => {
+  chrome.storage.sync.get(['serverUrl', 'autoTrack', 'dashboardPassword'], (result) => {
     serverUrl = result.serverUrl || '';
+    dashboardPassword = result.dashboardPassword || '';
     trackingEnabled = result.autoTrack !== false;
     console.log(LOG, 'Loaded settings:', { serverUrl: serverUrl ? 'set' : 'empty', trackingEnabled });
   });
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.serverUrl) serverUrl = changes.serverUrl.newValue || '';
+    if (changes.dashboardPassword) dashboardPassword = changes.dashboardPassword.newValue || '';
     if (changes.autoTrack) trackingEnabled = changes.autoTrack.newValue !== false;
   });
 
@@ -160,7 +163,11 @@
     for (const recipient of recipients) {
       try {
         const encoded = encodeURIComponent(recipient);
-        const res = await fetch(`${serverUrl}/new?to=${encoded}`);
+        const headers = {};
+        if (dashboardPassword) {
+          headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+        }
+        const res = await fetch(`${serverUrl}/new?to=${encoded}`, { headers });
         if (!res.ok) {
           console.warn(LOG, 'Failed to create tracker for', recipient, '- status:', res.status);
           continue;

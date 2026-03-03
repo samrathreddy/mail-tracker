@@ -3,16 +3,20 @@
 const POLL_INTERVAL = 60_000; // 1 minute
 
 async function getServerUrl() {
-  const { serverUrl } = await chrome.storage.sync.get('serverUrl');
-  return serverUrl || '';
+  const { serverUrl, dashboardPassword } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword']);
+  return { serverUrl: serverUrl || '', password: dashboardPassword || '' };
 }
 
 async function pollForOpens() {
-  const serverUrl = await getServerUrl();
+  const { serverUrl, password } = await getServerUrl();
   if (!serverUrl) return;
 
   try {
-    const res = await fetch(`${serverUrl}/list`);
+    const headers = {};
+    if (password) {
+      headers['Authorization'] = 'Basic ' + btoa(':' + password);
+    }
+    const res = await fetch(`${serverUrl}/list`, { headers });
     if (!res.ok) return;
     const pixels = await res.json();
 

@@ -35,6 +35,28 @@ function isBot(userAgent) {
   return BOT_PATTERNS.some(pattern => pattern.test(userAgent));
 }
 
+function checkAuth(request, env) {
+  if (!env.DASHBOARD_PASSWORD) return true; // no password set, allow access
+  
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Basic ')) return false;
+  
+  const base64 = authHeader.slice(6);
+  const decoded = atob(base64);
+  const [, password] = decoded.split(':');
+  
+  return password === env.DASHBOARD_PASSWORD;
+}
+
+function requireAuth() {
+  return new Response('Unauthorized', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="Mail Tracker Dashboard"',
+    },
+  });
+}
+
 function servePixel() {
   return new Response(PIXEL, {
     headers: {
@@ -119,6 +141,8 @@ export default {
 
     // GET /s/:id — stats for a tracking pixel
     if (url.pathname.startsWith('/s/')) {
+      if (!checkAuth(request, env)) return requireAuth();
+      
       const id = url.pathname.split('/s/')[1];
       if (!id) return new Response('Missing id', { status: 400 });
 
@@ -137,6 +161,7 @@ export default {
     // ?to=email@example.com — optional recipient for per-email tracking
     // Stores the creator's IP so their own opens are filtered out
     if (url.pathname === '/new') {
+      if (!checkAuth(request, env)) return requireAuth();
       const id = crypto.randomUUID().slice(0, 8);
       const senderIp = request.headers.get('cf-connecting-ip') || 'unknown';
       const recipient = url.searchParams.get('to') || null;
@@ -163,6 +188,8 @@ export default {
 
     // GET /list — JSON API for extension
     if (url.pathname === '/list') {
+      if (!checkAuth(request, env)) return requireAuth();
+      
       const list = await env.TRACKER.list();
       const results = [];
       for (const key of list.keys) {
@@ -180,6 +207,7 @@ export default {
 
     // DELETE /d/:id — delete a tracking pixel
     if (url.pathname.startsWith('/d/') && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
       const id = url.pathname.split('/d/')[1];
       if (!id) return json({ error: 'Missing id' }, 400);
       await env.TRACKER.delete(id);
@@ -188,6 +216,7 @@ export default {
 
     // GET / — simple dashboard listing all tracked pixels
     if (url.pathname === '/') {
+      if (!checkAuth(request, env)) return requireAuth();
       const list = await env.TRACKER.list();
       const results = [];
 

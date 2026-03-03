@@ -112,7 +112,22 @@ Published mail-tracker (1.2s)
 
 **Save this URL** — you'll enter it in the extension settings.
 
-To verify: open `https://mail-tracker.YOUR-SUBDOMAIN.workers.dev` in your browser. You should see the dashboard.
+#### Step 7 — Set Dashboard Password (Recommended)
+
+Protect your tracking data with a password:
+
+```bash
+pnpm exec wrangler secret put DASHBOARD_PASSWORD
+```
+
+When prompted, enter a secure password. This password will be required to:
+- Access the web dashboard
+- Use the Chrome extension
+- View tracking stats
+
+**Important:** The tracking pixel endpoint (`/t/:id`) remains open so emails can load properly.
+
+To verify: open `https://mail-tracker.YOUR-SUBDOMAIN.workers.dev` in your browser. You should be prompted for a password. Enter any username (it's ignored) and the password you just set.
 
 ---
 
@@ -150,8 +165,11 @@ Click the **puzzle piece icon** (Extensions) in Chrome's toolbar, then click the
    ```
    https://mail-tracker.YOUR-SUBDOMAIN.workers.dev
    ```
-4. Click **Save & Connect**
-5. If it says "Connected!" — you're done!
+4. If you set a password in Part 1, Step 7, enter it in the **Dashboard password** field
+5. Click **Save & Connect**
+6. If it says "Connected!" — you're done!
+
+**Note:** If you didn't set a password, leave the password field empty.
 
 ---
 
@@ -210,15 +228,30 @@ In the extension, you'll see:
 
 All endpoints return JSON except `/` (HTML dashboard) and `/t/:id` (serves PNG image).
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | Web dashboard with all pixels |
-| `GET /new` | Create a new tracker. Returns `{ id, pixel, html, stats }` |
-| `GET /new?to=email` | Create tracker for a specific recipient |
-| `GET /t/:id` | Tracking endpoint — serves 1x1 PNG and records the open |
-| `GET /s/:id` | Stats for a tracker — returns `{ opens, events[], recipient, skipped, filteredEvents[], hasSenderProtection }` |
-| `GET /list` | List all pixels — returns `[{ id, opens, skipped, recipient, lastOpen }]` |
-| `GET /d/:id` | Delete a tracker — returns `{ deleted: id }` |
+### Authentication
+
+If you set `DASHBOARD_PASSWORD`, all endpoints except `/t/:id` require HTTP Basic Authentication:
+
+```bash
+# Example with curl
+curl -u :your-password https://mail-tracker.YOUR-SUBDOMAIN.workers.dev/list
+```
+
+The username is ignored (can be empty). Only the password matters.
+
+**Note:** The tracking pixel endpoint (`/t/:id`) is always open so emails can load the image.
+
+### Endpoints
+
+| Endpoint | Auth Required | Description |
+|----------|:-------------:|-------------|
+| `GET /` | ✓ | Web dashboard with all pixels |
+| `GET /new` | ✓ | Create a new tracker. Returns `{ id, pixel, html, stats }` |
+| `GET /new?to=email` | ✓ | Create tracker for a specific recipient |
+| `GET /t/:id` | ✗ | Tracking endpoint — serves 1x1 PNG and records the open |
+| `GET /s/:id` | ✓ | Stats for a tracker — returns `{ opens, events[], recipient, skipped, filteredEvents[], hasSenderProtection }` |
+| `GET /list` | ✓ | List all pixels — returns `[{ id, opens, skipped, recipient, lastOpen }]` |
+| `GET /d/:id` | ✓ | Delete a tracker — returns `{ deleted: id }` |
 
 ---
 
