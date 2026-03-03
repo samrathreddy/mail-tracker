@@ -11,9 +11,6 @@ const CORS_HEADERS = {
 
 // Known email proxy/prefetch bot patterns
 const BOT_PATTERNS = [
-  /googleimageproxy/i,
-  /GoogleImageProxy/,
-  /Mozilla\/5\.0.*\(Windows NT 5\.1\).*via ggpht\.com/,  // Gmail proxy
   /Yahoo! Slurp/i,
   /Outlook-iOS/i,
   /Microsoft Outlook/i,
