@@ -241,7 +241,7 @@ export default {
       const html = `<!DOCTYPE html>
 <html><head><title>Mail Tracker</title>
 <style>
-  body { font-family: system-ui; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #0a0a0a; color: #e0e0e0; }
+  body { font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #0a0a0a; color: #e0e0e0; }
   h1 { font-size: 1.4rem; }
   table { width: 100%; border-collapse: collapse; margin-top: 20px; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #222; }
@@ -255,10 +255,11 @@ export default {
   <h1>Mail Tracker</h1>
   <button class="btn" onclick="createNew()">+ New Tracker</button>
   <table>
-    <tr><th>Email</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
+    <tr><th>Email</th><th>Created</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
     ${results.map(r => `
     <tr>
       <td>${r.email}</td>
+      <td>${r.createdAt ? new Date(r.createdAt).toLocaleString() : 'unknown'}</td>
       <td class="opens">${r.opens}</td>
       <td>${r.lastOpen}</td>
       <td><a href="/s/${r.id}">view</a></td>
