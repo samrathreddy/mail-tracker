@@ -224,10 +224,19 @@ export default {
         const data = await env.TRACKER.get(key.name, 'json');
         results.push({
           id: key.name,
+          email: data?.recipient || key.name,
           opens: data?.opens || 0,
           lastOpen: data?.events?.length ? data.events[data.events.length - 1].time : 'never',
+          createdAt: data?.createdAt || null,
         });
       }
+
+      // Sort by createdAt (newest first)
+      results.sort((a, b) => {
+        if (!a.createdAt) return 1;
+        if (!b.createdAt) return -1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
 
       const html = `<!DOCTYPE html>
 <html><head><title>Mail Tracker</title>
@@ -246,10 +255,10 @@ export default {
   <h1>Mail Tracker</h1>
   <button class="btn" onclick="createNew()">+ New Tracker</button>
   <table>
-    <tr><th>ID</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
+    <tr><th>Email</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
     ${results.map(r => `
     <tr>
-      <td><code>${r.id}</code></td>
+      <td>${r.email}</td>
       <td class="opens">${r.opens}</td>
       <td>${r.lastOpen}</td>
       <td><a href="/s/${r.id}">view</a></td>
