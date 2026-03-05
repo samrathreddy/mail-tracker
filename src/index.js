@@ -256,17 +256,22 @@ export default {
   <button class="btn" onclick="createNew()">+ New Tracker</button>
   <table>
     <tr><th>Email</th><th>Created</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
-    ${results.map(r => `
-    <tr>
-      <td>${r.email}</td>
-      <td>${r.createdAt ? new Date(r.createdAt).toLocaleString() : 'unknown'}</td>
-      <td class="opens">${r.opens}</td>
-      <td>${r.lastOpen}</td>
-      <td><a href="/s/${r.id}">view</a></td>
-    </tr>`).join('')}
   </table>
   ${results.length === 0 ? '<p style="color:#666;margin-top:20px;">No tracked emails yet. Click "+ New Tracker" to create one.</p>' : ''}
   <script>
+    const data = ${JSON.stringify(results)};
+    const tbody = document.querySelector('table');
+    data.forEach(r => {
+      const row = tbody.insertRow();
+      row.innerHTML = \`
+        <td>\${r.email}</td>
+        <td>\${r.createdAt ? new Date(r.createdAt).toLocaleString() : 'unknown'}</td>
+        <td class="opens">\${r.opens}</td>
+        <td>\${r.lastOpen !== 'never' ? new Date(r.lastOpen).toLocaleString() : 'never'}</td>
+        <td><a href="/s/\${r.id}">view</a></td>
+      \`;
+    });
+
     async function createNew() {
       const res = await fetch('/new');
       const data = await res.json();
