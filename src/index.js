@@ -23,6 +23,17 @@ const BOT_PATTERNS = [
 
 const DEDUP_WINDOW_MS = 5000; // 5 second dedup window
 
+function formatTime(isoString) {
+  return new Date(isoString).toLocaleString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
@@ -261,13 +272,25 @@ export default {
   <script>
     const data = ${JSON.stringify(results)};
     const tbody = document.querySelector('table');
+    
+    function formatTime(isoString) {
+      return new Date(isoString).toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    
     data.forEach(r => {
       const row = tbody.insertRow();
       row.innerHTML = \`
         <td>\${r.email}</td>
-        <td>\${r.createdAt ? new Date(r.createdAt).toLocaleString() : 'unknown'}</td>
+        <td>\${r.createdAt ? formatTime(r.createdAt) : 'unknown'}</td>
         <td class="opens">\${r.opens}</td>
-        <td>\${r.lastOpen !== 'never' ? new Date(r.lastOpen).toLocaleString() : 'never'}</td>
+        <td>\${r.lastOpen !== 'never' ? formatTime(r.lastOpen) : 'never'}</td>
         <td><a href="/s/\${r.id}">view</a></td>
       \`;
     });
