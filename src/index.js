@@ -6,7 +6,7 @@ const PIXEL = Uint8Array.from(atob(
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 // Known email proxy/prefetch bot patterns
@@ -284,7 +284,16 @@ export default {
     // ?to=email@example.com — optional recipient for per-email tracking
     // Stores the creator's IP so their own opens are filtered out
     if (url.pathname === '/new') {
-      if (!checkAuth(request, env)) return requireAuth();
+      if (!checkAuth(request, env)) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Basic realm="Mail Tracker Dashboard"',
+            ...CORS_HEADERS,
+          },
+        });
+      }
+      
       const id = crypto.randomUUID().slice(0, 8);
       const senderIp = request.headers.get('cf-connecting-ip') || 'unknown';
       const recipient = url.searchParams.get('to') || null;
@@ -311,7 +320,15 @@ export default {
 
     // GET /list — JSON API for extension
     if (url.pathname === '/list') {
-      if (!checkAuth(request, env)) return requireAuth();
+      if (!checkAuth(request, env)) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': 'Basic realm="Mail Tracker Dashboard"',
+            ...CORS_HEADERS,
+          },
+        });
+      }
       
       const list = await env.TRACKER.list();
       const results = [];
