@@ -7,6 +7,67 @@
   let dashboardPassword = '';
   let trackingEnabled = true;
 
+  // Add CSS for read indicators
+  const style = document.createElement('style');
+  style.textContent = `
+    .mail-tracker-status {
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: help;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+    }
+    .mail-tracker-status:hover {
+      opacity: 1;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Cache for tracking data to avoid excessive API calls
+  let trackingDataCache = null;
+  let lastCacheUpdate = 0;
+  const CACHE_DURATION = 5000; // 5 second cache
+  let currentView = '';
+
+  // Get tracking data with caching
+  async function getTrackingData() {
+    const now = Date.now();
+    
+    console.log(LOG, 'getTrackingData called - cache age:', now - lastCacheUpdate, 'ms');
+    
+    // Return cached data if still valid
+    if (trackingDataCache && (now - lastCacheUpdate) < CACHE_DURATION) {
+      console.log(LOG, 'Using cached data, no API call');
+      return trackingDataCache;
+    }
+    
+    console.log(LOG, 'Cache expired or empty, making API call...');
+    
+    try {
+      const headers = {};
+      if (dashboardPassword) {
+        headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+      }
+      
+      console.log(LOG, 'Making /list API call');
+      const res = await fetch(`${serverUrl}/list`, { headers });
+      if (res.ok) {
+        trackingDataCache = await res.json();
+        lastCacheUpdate = now;
+        console.log(LOG, 'API call successful, cached', trackingDataCache.length, 'trackers');
+        return trackingDataCache;
+      } else {
+        console.warn(LOG, 'Failed to fetch tracking data:', res.status);
+        return [];
+      }
+    } catch (e) {
+      console.warn(LOG, 'Error fetching tracking data:', e);
+      return [];
+    }
+  }
+
   // Load settings
   chrome.storage.sync.get(['serverUrl', 'autoTrack', 'dashboardPassword'], (result) => {
     serverUrl = result.serverUrl || '';
@@ -146,6 +207,52 @@
     }
   }
 
+  // Add read status indicators next to recipients
+  function addReadIndicators(composeForm) {
+    console.log(LOG, 'Adding read indicators...');
+    
+    // Find all recipient chips in the compose form
+    const recipientChips = composeForm.querySelectorAll('span[email], [data-hovercard-id]');
+    console.log(LOG, 'Found recipient chips:', recipientChips.length);
+    
+    recipientChips.forEach(async (chip) => {
+      const email = chip.getAttribute('email') || chip.getAttribute('data-hovercard-id');
+      if (!email || chip.querySelector('.mail-tracker-status')) return;
+      
+      console.log(LOG, 'Adding indicator for:', email);
+      
+      // Create status indicator
+      const statusEl = document.createElement('span');
+      statusEl.className = 'mail-tracker-status';
+      statusEl.style.cssText = 'margin-left: 6px; font-size: 12px; color: #5f6368; cursor: help; font-weight: bold;';
+      statusEl.textContent = '✓'; // Single tick for sent
+      statusEl.title = 'Sent but not opened yet';
+      
+      // Insert after the chip
+      chip.parentNode.insertBefore(statusEl, chip.nextSibling);
+      console.log(LOG, 'Indicator added for:', email);
+      
+      // Update status with cached data
+      const trackers = await getTrackingData();
+      const tracker = trackers.find(t => t.recipient === email);
+      
+      if (tracker && tracker.opens > 0) {
+        statusEl.textContent = '✓✓'; // Double tick for read
+        statusEl.style.color = '#1a73e8'; // Blue for read
+        
+        const lastOpen = tracker.lastOpen ? new Date(tracker.lastOpen).toLocaleString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          month: 'short',
+          day: 'numeric'
+        }) : 'never';
+        
+        statusEl.title = `Opened ${tracker.opens} time${tracker.opens > 1 ? 's' : ''}\nLast opened: ${lastOpen}`;
+      }
+    });
+  }
+
   // Process a compose window — inject pixels for untracked recipients
   async function processCompose(bodyEl) {
     const form = findComposeForm(bodyEl);
@@ -162,6 +269,13 @@
 
     console.log(LOG, 'Found untracked recipients:', untracked);
     await injectTracker(bodyEl, untracked);
+    
+    // Add read indicators after injecting trackers with longer delay
+    console.log(LOG, 'Scheduling read indicators...');
+    setTimeout(() => {
+      console.log(LOG, 'Adding read indicators now...');
+      addReadIndicators(form);
+    }, 3000);
   }
 
   // Watch for Send button clicks and keyboard shortcut — inject right before send
@@ -195,10 +309,109 @@
     }, true);
   }
 
+  // Periodically update read indicators for open compose windows
+  function startStatusUpdater() {
+    // No periodic updates - only fetch on view changes
+  }
+
+  // Add read indicators to sent emails in inbox view
+  async function addInboxReadIndicators() {
+    if (!serverUrl || !dashboardPassword) return;
+    
+    console.log(LOG, 'addInboxReadIndicators called');
+    
+    // Fetch tracking data ONCE before processing emails
+    const trackers = await getTrackingData();
+    console.log(LOG, 'Got', trackers.length, 'trackers for processing');
+    
+    // Find sent email rows (emails with "To: " prefix)
+    const sentRows = document.querySelectorAll('tr[role="row"]');
+    console.log(LOG, 'Found', sentRows.length, 'email rows');
+    
+    sentRows.forEach((row, index) => {
+      const toField = row.querySelector('.yW');
+      if (!toField || !toField.textContent.startsWith('To: ')) return;
+      
+      const emailSpan = toField.querySelector('span[email]');
+      if (!emailSpan || emailSpan.querySelector('.mail-tracker-status')) return;
+      
+      const email = emailSpan.getAttribute('email');
+      console.log(LOG, 'Processing row', index, 'for email:', email);
+      
+      // Check if this email was actually tracked (using already fetched data)
+      const tracker = trackers.find(t => t.recipient === email);
+      
+      // Only add indicator if email was tracked
+      if (!tracker) {
+        console.log(LOG, 'Email', email, 'not tracked, skipping');
+        return;
+      }
+      
+      console.log(LOG, 'Found tracked email to:', email);
+      
+      // Create status indicator
+      const statusEl = document.createElement('span');
+      statusEl.className = 'mail-tracker-status';
+      statusEl.style.cssText = 'margin-left: 6px; font-size: 11px; color: #5f6368; cursor: help; font-weight: bold;';
+      
+      if (tracker.opens > 0) {
+        statusEl.textContent = '✓✓'; // Double tick for read
+        statusEl.style.color = '#1a73e8'; // Blue for read
+        
+        const lastOpen = tracker.lastOpen ? new Date(tracker.lastOpen).toLocaleString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          month: 'short',
+          day: 'numeric'
+        }) : 'never';
+        
+        statusEl.title = `Opened ${tracker.opens} time${tracker.opens > 1 ? 's' : ''}\nLast opened: ${lastOpen}`;
+      } else {
+        statusEl.textContent = '✓'; // Single tick for sent
+        statusEl.title = 'Sent but not opened yet';
+      }
+      
+      // Insert after email span
+      emailSpan.parentNode.insertBefore(statusEl, emailSpan.nextSibling);
+      console.log(LOG, 'Added indicator for tracked email:', email);
+    });
+  }
+
   // Initialize tracking
   if (window.location.hostname === 'mail.google.com') {
     console.log(LOG, 'Initializing...');
     setupSendInterception();
+    
+    // Detect view changes and fetch data only when needed
+    let lastUrl = location.href;
+    
+    function handleViewChange() {
+      const newView = location.hash;
+      if (newView !== currentView) {
+        currentView = newView;
+        console.log(LOG, 'View changed to:', currentView);
+        
+        // Clear cache on view change to force fresh data
+        trackingDataCache = null;
+        
+        // Add indicators based on current view
+        if (newView.includes('inbox') || newView.includes('sent')) {
+          setTimeout(() => addInboxReadIndicators(), 1000);
+        }
+      }
+    }
+    
+    // Initial load
+    handleViewChange();
+    
+    // Watch for URL changes
+    new MutationObserver(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        handleViewChange();
+      }
+    }).observe(document, { subtree: true, childList: true });
   }
 
 })();
