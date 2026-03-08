@@ -5,7 +5,7 @@ const PIXEL = Uint8Array.from(atob(
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -280,8 +280,9 @@ export default {
       return new Response(html, { headers: { 'Content-Type': 'text/html' } });
     }
 
-    // GET /new — create a new tracking pixel ID
-    // ?to=email@example.com — optional recipient for per-email tracking
+    // GET/POST /new — create a new tracking pixel ID
+    // GET ?to=email@example.com — optional recipient for per-email tracking
+    // POST with JSON body: { to, subject, bodyPreview }
     // Stores the creator's IP so their own opens are filtered out
     if (url.pathname === '/new') {
       if (!checkAuth(request, env)) {
@@ -296,7 +297,23 @@ export default {
       
       const id = crypto.randomUUID().slice(0, 8);
       const senderIp = request.headers.get('cf-connecting-ip') || 'unknown';
-      const recipient = url.searchParams.get('to') || null;
+      
+      let recipient = null;
+      let subject = '';
+      let bodyPreview = '';
+      
+      if (request.method === 'POST') {
+        try {
+          const body = await request.json();
+          recipient = body.to || null;
+          subject = body.subject || '';
+          bodyPreview = body.bodyPreview || '';
+        } catch (e) {
+          return json({ error: 'Invalid JSON body' }, 400);
+        }
+      } else {
+        recipient = url.searchParams.get('to') || null;
+      }
 
       await env.TRACKER.put(id, JSON.stringify({
         opens: 0,
@@ -305,6 +322,8 @@ export default {
         skipped: 0,
         senderIp,
         recipient,
+        subject,
+        bodyPreview,
         createdAt: new Date().toISOString(),
       }));
 
@@ -315,6 +334,8 @@ export default {
         html: `<img src="${base}/t/${id}" width="1" height="1" style="display:none" />`,
         stats: `${base}/s/${id}`,
         recipient,
+        subject,
+        bodyPreview,
       });
     }
 
@@ -365,6 +386,8 @@ export default {
         results.push({
           id: key.name,
           email: data?.recipient || key.name,
+          subject: data?.subject || '',
+          bodyPreview: data?.bodyPreview || '',
           opens: data?.opens || 0,
           lastOpen: data?.events?.length ? data.events[data.events.length - 1].time : 'never',
           createdAt: data?.createdAt || null,
@@ -388,6 +411,8 @@ export default {
   th { color: #888; font-size: 0.85rem; text-transform: uppercase; }
   a { color: #60a5fa; text-decoration: none; }
   .opens { font-weight: bold; color: #34d399; }
+  .subject { font-weight: 500; color: #e0e0e0; }
+  .preview { color: #888; font-size: 0.85rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .btn { display: inline-block; margin-top: 16px; padding: 8px 16px; background: #1d4ed8; color: white; border-radius: 6px; cursor: pointer; border: none; font-size: 0.9rem; }
   .btn:hover { background: #2563eb; }
 </style></head>
@@ -395,7 +420,7 @@ export default {
   <h1>Mail Tracker</h1>
   <button class="btn" onclick="createNew()">+ New Tracker</button>
   <table>
-    <tr><th>Email</th><th>Created</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
+    <tr><th>Email</th><th>Subject</th><th>Created</th><th>Opens</th><th>Last Open</th><th>Details</th></tr>
   </table>
   ${results.length === 0 ? '<p style="color:#666;margin-top:20px;">No tracked emails yet. Click "+ New Tracker" to create one.</p>' : ''}
   <script>
@@ -417,6 +442,10 @@ export default {
       const row = tbody.insertRow();
       row.innerHTML = \`
         <td>\${r.email}</td>
+        <td>
+          <div class="subject">\${r.subject || 'No subject'}</div>
+          <div class="preview">\${r.bodyPreview || ''}</div>
+        </td>
         <td>\${r.createdAt ? formatTime(r.createdAt) : 'unknown'}</td>
         <td class="opens">\${r.opens}</td>
         <td>\${r.lastOpen !== 'never' ? formatTime(r.lastOpen) : 'never'}</td>
