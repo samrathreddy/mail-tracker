@@ -362,6 +362,10 @@
     
     console.log(LOG, 'addInboxReadIndicators called');
     
+    // First, remove all existing indicators to prevent duplicates
+    document.querySelectorAll('.mail-tracker-status').forEach(el => el.remove());
+    console.log(LOG, 'Cleared existing indicators');
+    
     // Fetch tracking data ONCE before processing emails
     const trackers = await getTrackingData();
     console.log(LOG, 'Got', trackers.length, 'trackers for processing');
@@ -375,7 +379,7 @@
       if (!toField || !toField.textContent.startsWith('To: ')) return;
       
       const emailSpan = toField.querySelector('span[email]');
-      if (!emailSpan || emailSpan.querySelector('.mail-tracker-status')) return;
+      if (!emailSpan) return; // Remove the duplicate check since we cleared all indicators above
       
       const email = emailSpan.getAttribute('email');
       console.log(LOG, 'Processing row', index, 'for email:', email);
