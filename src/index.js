@@ -301,6 +301,7 @@ export default {
       let recipient = null;
       let subject = '';
       let bodyPreview = '';
+      let messageId = '';
       
       if (request.method === 'POST') {
         try {
@@ -308,6 +309,7 @@ export default {
           recipient = body.to || null;
           subject = body.subject || '';
           bodyPreview = body.bodyPreview || '';
+          messageId = body.messageId || '';
         } catch (e) {
           return json({ error: 'Invalid JSON body' }, 400);
         }
@@ -324,6 +326,7 @@ export default {
         recipient,
         subject,
         bodyPreview,
+        messageId,
         createdAt: new Date().toISOString(),
       }));
 
@@ -360,6 +363,9 @@ export default {
           opens: data?.opens || 0,
           skipped: data?.skipped || 0,
           recipient: data?.recipient || null,
+          subject: data?.subject || '',
+          bodyPreview: data?.bodyPreview || '',
+          messageId: data?.messageId || '',
           lastOpen: data?.events?.length ? data.events[data.events.length - 1].time : null,
         });
       }

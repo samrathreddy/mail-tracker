@@ -171,7 +171,8 @@
         const payload = {
           to: recipient,
           subject: emailContent.subject,
-          bodyPreview: emailContent.bodyPreview
+          bodyPreview: emailContent.bodyPreview,
+          messageId: Date.now() + '-' + Math.random().toString(36).substr(2, 9) // Unique message ID
         };
         
         const res = await fetch(`${serverUrl}/new`, { 
@@ -193,6 +194,7 @@
         img.style.cssText = 'display:none!important;width:1px!important;height:1px!important;opacity:0!important;position:absolute!important;';
         img.setAttribute('data-mail-tracker', data.id);
         img.setAttribute('data-mail-tracker-to', recipient);
+        img.setAttribute('data-message-id', payload.messageId);
 
         bodyEl.appendChild(img);
         injectedCount++;
@@ -207,7 +209,47 @@
     }
   }
 
-  // Add read status indicators next to recipients
+  // Extract unique identifiers from Gmail thread
+  function getEmailIdentifiers(row) {
+    // Try to get Gmail's thread ID or message ID
+    const threadId = row.querySelector('[data-thread-id]')?.getAttribute('data-thread-id') ||
+                    row.querySelector('[data-legacy-thread-id]')?.getAttribute('data-legacy-thread-id');
+    
+    // Get subject from the email row
+    const subjectEl = row.querySelector('.bog span') || row.querySelector('.y6 span');
+    const subject = subjectEl?.textContent?.trim() || '';
+    
+    // Get timestamp
+    const timeEl = row.querySelector('[title*="2026"]') || row.querySelector('span[title]');
+    const timestamp = timeEl?.getAttribute('title') || '';
+    
+    return { threadId, subject, timestamp };
+  }
+
+  // Find best matching tracker for an email
+  function findMatchingTracker(trackers, email, identifiers) {
+    // First try exact subject + recipient match
+    let matches = trackers.filter(t => 
+      t.recipient === email && 
+      t.subject && 
+      identifiers.subject.includes(t.subject)
+    );
+    
+    if (matches.length === 1) return matches[0];
+    
+    // If multiple matches, try to find most recent
+    if (matches.length > 1) {
+      return matches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    }
+    
+    // Fallback to any tracker for this recipient (most recent)
+    matches = trackers.filter(t => t.recipient === email);
+    if (matches.length > 0) {
+      return matches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    }
+    
+    return null;
+  }
   function addReadIndicators(composeForm) {
     console.log(LOG, 'Adding read indicators...');
     
@@ -338,8 +380,12 @@
       const email = emailSpan.getAttribute('email');
       console.log(LOG, 'Processing row', index, 'for email:', email);
       
-      // Check if this email was actually tracked (using already fetched data)
-      const tracker = trackers.find(t => t.recipient === email);
+      // Get email identifiers for better matching
+      const identifiers = getEmailIdentifiers(row);
+      console.log(LOG, 'Email identifiers:', identifiers);
+      
+      // Find the best matching tracker for this specific email
+      const tracker = findMatchingTracker(trackers, email, identifiers);
       
       // Only add indicator if email was tracked
       if (!tracker) {
@@ -388,30 +434,33 @@
     
     function handleViewChange() {
       const newView = location.hash;
-      if (newView !== currentView) {
+      console.log(LOG, 'URL changed to:', newView);
+      
+      // Only process if we're actually changing to sent folder view
+      if (newView !== currentView && newView === '#sent') {
         currentView = newView;
-        console.log(LOG, 'View changed to:', currentView);
-        
+        console.log(LOG, 'Entered sent folder, loading indicators');
         // Clear cache on view change to force fresh data
         trackingDataCache = null;
-        
-        // Add indicators based on current view
-        if (newView.includes('inbox') || newView.includes('sent')) {
-          setTimeout(() => addInboxReadIndicators(), 1000);
-        }
+        setTimeout(() => addInboxReadIndicators(), 1000);
+      } else if (newView !== currentView) {
+        currentView = newView;
+        console.log(LOG, 'Changed to:', currentView, '- not sent folder, skipping');
       }
     }
     
-    // Initial load
-    handleViewChange();
+    // Initial load - only if already in sent
+    if (location.hash === '#sent') {
+      handleViewChange();
+    }
     
-    // Watch for URL changes
-    new MutationObserver(() => {
+    // Watch for URL changes with polling instead of MutationObserver
+    setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         handleViewChange();
       }
-    }).observe(document, { subtree: true, childList: true });
+    }, 1000);
   }
 
 })();
