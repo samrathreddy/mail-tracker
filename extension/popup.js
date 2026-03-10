@@ -59,7 +59,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- API helpers ---
 async function api(path) {
-  const headers = {};
+  const headers = {
+    'Accept': 'application/json'
+  };
   if (dashboardPassword) {
     headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
   }

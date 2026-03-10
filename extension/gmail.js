@@ -196,9 +196,14 @@
         img.setAttribute('data-mail-tracker-to', recipient);
         img.setAttribute('data-message-id', payload.messageId);
 
-        bodyEl.appendChild(img);
+        // Try to inject into the actual email content area, not just the compose div
+        const contentArea = bodyEl.querySelector('[contenteditable="true"]') || 
+                           bodyEl.querySelector('.Am.Al.editable') ||
+                           bodyEl;
+        
+        contentArea.appendChild(img);
         injectedCount++;
-        console.log(LOG, 'Injected tracker for', recipient, '- id:', data.id);
+        console.log(LOG, 'Injected tracker into content area for', recipient, '- id:', data.id);
       } catch (e) {
         console.warn(LOG, 'Error creating tracker for', recipient, e.message);
       }
@@ -323,16 +328,19 @@
   // Watch for Send button clicks and keyboard shortcut — inject right before send
   function setupSendInterception() {
     // Keyboard shortcut: Ctrl+Enter or Cmd+Enter
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', async (e) => {
       if (!trackingEnabled || !serverUrl) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         console.log(LOG, 'Send shortcut detected');
-        findComposeBodies().forEach(body => processCompose(body));
+        // Process immediately before Gmail sends
+        for (const body of findComposeBodies()) {
+          await processCompose(body);
+        }
       }
     }, true);
 
     // Click on any Send button — use mousedown to fire before Gmail's click handler
-    document.addEventListener('mousedown', (e) => {
+    document.addEventListener('mousedown', async (e) => {
       if (!trackingEnabled || !serverUrl) return;
 
       const target = e.target.closest(
@@ -346,7 +354,10 @@
 
       if (target) {
         console.log(LOG, 'Send button mousedown detected');
-        findComposeBodies().forEach(body => processCompose(body));
+        // Process immediately before Gmail sends
+        for (const body of findComposeBodies()) {
+          await processCompose(body);
+        }
       }
     }, true);
   }
