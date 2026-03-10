@@ -316,48 +316,41 @@
 
     console.log(LOG, 'Found untracked recipients:', untracked);
     await injectTracker(bodyEl, untracked);
-    
-    // Add read indicators after injecting trackers with longer delay
-    console.log(LOG, 'Scheduling read indicators...');
-    setTimeout(() => {
-      console.log(LOG, 'Adding read indicators now...');
-      addReadIndicators(form);
-    }, 3000);
   }
 
-  // Watch for Send button clicks and keyboard shortcut — inject right before send
-  function setupSendInterception() {
-    // Keyboard shortcut: Ctrl+Enter or Cmd+Enter
-    document.addEventListener('keydown', async (e) => {
+  // Watch for recipient changes and inject pixels immediately
+  function startRecipientWatcher() {
+    setInterval(() => {
       if (!trackingEnabled || !serverUrl) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        console.log(LOG, 'Send shortcut detected');
-        // Process immediately before Gmail sends
-        for (const body of findComposeBodies()) {
-          await processCompose(body);
+      
+      findComposeBodies().forEach(bodyEl => {
+        const form = findComposeForm(bodyEl);
+        if (!form) return;
+        
+        const recipients = getRecipients(form);
+        if (recipients.length === 0) return;
+        
+        const untracked = getUntrackedRecipients(bodyEl, recipients);
+        if (untracked.length > 0) {
+          console.log(LOG, 'New recipients detected:', untracked);
+          processCompose(bodyEl);
         }
-      }
-    }, true);
+      });
+    }, 2000); // Check every 2 seconds
+  }
 
-    // Click on any Send button — use mousedown to fire before Gmail's click handler
-    document.addEventListener('mousedown', async (e) => {
+  // Watch for Send button clicks — just for logging
+  function setupSendInterception() {
+    document.addEventListener('mousedown', (e) => {
       if (!trackingEnabled || !serverUrl) return;
 
       const target = e.target.closest(
         'div[role="button"][aria-label*="Send"], ' +
-        'div[role="button"][data-tooltip*="Send"], ' +
-        'div[role="button"][aria-label*="send"], ' +
-        'div[role="button"][data-tooltip*="send"], ' +
-        'div.T-I.J-J5-Ji[data-tooltip*="Send"], ' +
-        'div.T-I.J-J5-Ji[data-tooltip*="send"]'
+        'div[role="button"][data-tooltip*="Send"]'
       );
 
       if (target) {
-        console.log(LOG, 'Send button mousedown detected');
-        // Process immediately before Gmail sends
-        for (const body of findComposeBodies()) {
-          await processCompose(body);
-        }
+        console.log(LOG, 'Send button clicked - pixels should already be injected');
       }
     }, true);
   }
@@ -443,6 +436,7 @@
   if (window.location.hostname === 'mail.google.com') {
     console.log(LOG, 'Initializing...');
     setupSendInterception();
+    startRecipientWatcher(); // Watch for recipients and inject pixels immediately
     
     // Detect view changes and fetch data only when needed
     let lastUrl = location.href;
