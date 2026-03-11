@@ -1,6 +1,6 @@
 // Background service worker — polls for new opens and sends notifications
 
-const POLL_INTERVAL = 60_000; // 1 minute
+const POLL_INTERVAL = 300_000; // 5 minutes
 
 async function getServerUrl() {
   const { serverUrl, dashboardPassword } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword']);
@@ -48,7 +48,7 @@ async function pollForOpens() {
 }
 
 // Poll on alarm
-chrome.alarms.create('poll-opens', { periodInMinutes: 1 });
+chrome.alarms.create('poll-opens', { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'poll-opens') pollForOpens();
 });
