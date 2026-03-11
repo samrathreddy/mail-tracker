@@ -4,6 +4,8 @@ A lightweight email open tracking service built with Cloudflare Workers + a Chro
 
 When you send an email from Gmail, the extension automatically injects an invisible 1x1 tracking pixel per recipient. When they open the email, you get a notification with their name, open count, location, and device.
 
+**✨ WhatsApp-Style Read Indicators:** See ✓ (sent) and ✓✓ (read) status next to recipients in your Gmail sent folder, with hover tooltips showing open count and timestamps.
+
 ## How It Works
 
 ```
@@ -188,6 +190,12 @@ Just use Gmail normally:
    - Lets the email send normally
 4. When a recipient opens the email, you'll get a Chrome notification:
    > "bob@example.com opened your email"
+
+**WhatsApp-Style Read Indicators:**
+- **✓ Single gray tick** - Email sent but not opened yet
+- **✓✓ Double blue tick** - Email opened by recipient
+- **Hover tooltips** show "Opened X times, Last opened: timestamp"
+- **Appears in Gmail sent folder** next to recipient names
 
 You can click the extension icon anytime to see:
 - All tracked emails with recipient names
