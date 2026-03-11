@@ -24,8 +24,9 @@ You send email in Gmail → extension auto-injects invisible pixel per recipient
 |-------------|-------------|----------------|
 | **Node.js** v18+ | `node -v` | [nodejs.org](https://nodejs.org/) |
 | **pnpm** | `pnpm -v` | `npm install -g pnpm` |
-| **Cloudflare account** | — | [Sign up free](https://dash.cloudflare.com/sign-up) |
-| **Chrome browser** | — | [chrome.google.com](https://www.google.com/chrome/) |
+| **Cloudflare account** (free) | — | [Sign up](https://dash.cloudflare.com/sign-up) |
+| **Chrome browser** | — | [Download](https://www.google.com/chrome/) |
+| **Gmail account** | — | Required for tracking |
 
 ---
 
@@ -103,7 +104,7 @@ Open [http://localhost:8787](http://localhost:8787) in your browser. You should 
 #### Step 6 — Deploy to Cloudflare
 
 ```bash
-pnpm deploy
+pnpm run deploy
 ```
 
 Output will show your live URL:
