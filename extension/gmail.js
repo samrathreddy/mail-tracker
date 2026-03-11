@@ -318,31 +318,13 @@
     await injectTracker(bodyEl, untracked);
   }
 
-  // Watch for recipient changes and inject pixels immediately
-  function startRecipientWatcher() {
-    setInterval(() => {
-      if (!trackingEnabled || !serverUrl) return;
-      
-      findComposeBodies().forEach(bodyEl => {
-        const form = findComposeForm(bodyEl);
-        if (!form) return;
-        
-        const recipients = getRecipients(form);
-        if (recipients.length === 0) return;
-        
-        const untracked = getUntrackedRecipients(bodyEl, recipients);
-        if (untracked.length > 0) {
-          console.log(LOG, 'New recipients detected:', untracked);
-          processCompose(bodyEl);
-        }
-      });
-    }, 2000); // Check every 2 seconds
-  }
-
-  // Watch for Send button clicks — just for logging
+  // Watch for Send button clicks — block send, inject pixels, then allow send
+  let isSending = false; // Flag to prevent infinite loop
+  
   function setupSendInterception() {
-    document.addEventListener('mousedown', (e) => {
+    document.addEventListener('click', async (e) => {
       if (!trackingEnabled || !serverUrl) return;
+      if (isSending) return; // Skip if already sending
 
       const target = e.target.closest(
         'div[role="button"][aria-label*="Send"], ' +
@@ -350,9 +332,42 @@
       );
 
       if (target) {
-        console.log(LOG, 'Send button clicked - pixels should already be injected');
+        console.log(LOG, 'Send button clicked - checking for untracked recipients');
+        
+        // Prevent the send
+        e.stopPropagation();
+        e.preventDefault();
+        
+        // Set flag to prevent re-interception
+        isSending = true;
+        
+        // Process all compose windows
+        const bodies = findComposeBodies();
+        for (const body of bodies) {
+          const form = findComposeForm(body);
+          if (!form) continue;
+          
+          const recipients = getRecipients(form);
+          const untracked = getUntrackedRecipients(body, recipients);
+          
+          if (untracked.length > 0) {
+            console.log(LOG, 'Injecting pixels for untracked recipients:', untracked);
+            await processCompose(body);
+            // Wait a bit for pixels to be added to DOM
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        console.log(LOG, 'All pixels injected, sending email now');
+        
+        // Now trigger the actual send
+        setTimeout(() => {
+          target.click();
+          // Reset flag after send
+          setTimeout(() => { isSending = false; }, 1000);
+        }, 100);
       }
-    }, true);
+    }, true); // Use capture phase to intercept before Gmail
   }
 
   // Periodically update read indicators for open compose windows
@@ -436,7 +451,6 @@
   if (window.location.hostname === 'mail.google.com') {
     console.log(LOG, 'Initializing...');
     setupSendInterception();
-    startRecipientWatcher(); // Watch for recipients and inject pixels immediately
     
     // Detect view changes and fetch data only when needed
     let lastUrl = location.href;
