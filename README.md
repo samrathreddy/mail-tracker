@@ -1,7 +1,7 @@
 <div align="center">
   <img src="extension/icons/icon128.png" alt="Mail Tracker Logo" width="128" height="128">
   
-  # 📬 Mail Tracker
+  # Mail Tracker
 
   ### Know when your emails are opened — automatically, privately, and for free.
 
