@@ -317,6 +317,16 @@ export default {
         recipient = url.searchParams.get('to') || null;
       }
 
+      // Validate email format
+      if (recipient && !recipient.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        return json({ error: 'Invalid email format' }, 400);
+      }
+
+      // Limit string lengths
+      if (subject.length > 500 || bodyPreview.length > 1000) {
+        return json({ error: 'Input too long' }, 400);
+      }
+
       await env.TRACKER.put(id, JSON.stringify({
         opens: 0,
         events: [],
