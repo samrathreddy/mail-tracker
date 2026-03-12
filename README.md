@@ -1,12 +1,20 @@
-# 📬 Mail Tracker
+<div align="center">
+  <img src="extension/icons/icon128.png" alt="Mail Tracker Logo" width="128" height="128">
+  
+  # 📬 Mail Tracker
 
-> **Know when your emails are opened — automatically, privately, and for free.**
+  ### Know when your emails are opened — automatically, privately, and for free.
 
-A lightweight email open tracking system with WhatsApp-style read receipts for Gmail. Built with Cloudflare Workers (serverless backend) + Chrome extension (auto-tracking).
+  [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+  [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
+  [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)](https://developer.chrome.com/docs/extensions/)
+  
+  **⚡ Install in 5 minutes** | Self-hosted | 100% Free
+</div>
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)](https://developer.chrome.com/docs/extensions/)
+---
+
+A lightweight email open tracking system with WhatsApp-style read receipts for Gmail. Built with Cloudflare Workers (serverless backend) + Chrome extension (auto-tracking)
 
 ---
 
