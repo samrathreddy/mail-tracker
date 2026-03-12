@@ -14,6 +14,7 @@ async function sendSlackNotification(webhookUrl, data) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message)
     });
+    console.log('Slack response:', response.status, response.ok);
     return response.ok;
   } catch (e) {
     console.error('Slack notification failed:', e);
@@ -64,6 +65,7 @@ async function sendDiscordNotification(webhookUrl, data) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message)
     });
+    console.log('Discord response:', response.status, response.ok);
     return response.ok;
   } catch (e) {
     console.error('Discord notification failed:', e);
@@ -79,16 +81,31 @@ async function sendDiscordNotification(webhookUrl, data) {
 export async function sendWebhookNotifications(env, data) {
   const promises = [];
 
+  console.log('sendWebhookNotifications called with:', data);
+
   if (env.SLACK_WEBHOOK_URL) {
+    console.log('Sending to Slack...');
     promises.push(sendSlackNotification(env.SLACK_WEBHOOK_URL, data));
+  } else {
+    console.log('No Slack webhook URL');
   }
 
   if (env.DISCORD_WEBHOOK_URL) {
+    console.log('Sending to Discord...');
     promises.push(sendDiscordNotification(env.DISCORD_WEBHOOK_URL, data));
+  } else {
+    console.log('No Discord webhook URL');
   }
 
-  // Send all notifications in parallel, don't wait for responses
+  // Send all notifications in parallel and wait for completion
   if (promises.length > 0) {
-    Promise.all(promises).catch(e => console.error('Webhook notifications failed:', e));
+    try {
+      await Promise.all(promises);
+      console.log('All webhooks sent successfully');
+    } catch (e) {
+      console.error('Webhook notifications failed:', e);
+    }
+  } else {
+    console.log('No webhooks configured');
   }
 }

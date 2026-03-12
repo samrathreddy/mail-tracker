@@ -128,6 +128,8 @@ When prompted, enter a secure password. This password will be required to:
 - Use the Chrome extension
 - View tracking stats
 
+**Note:** Secrets are stored encrypted in Cloudflare, not in `.env` or `wrangler.toml`. The `.env.example` file is just a template for reference.
+
 **Important:** The tracking pixel endpoint (`/t/:id`) remains open so emails can load properly.
 
 To verify: open `https://mail-tracker.YOUR-SUBDOMAIN.workers.dev` in your browser. You should be prompted for a password. Enter any username (it's ignored) and the password you just set.

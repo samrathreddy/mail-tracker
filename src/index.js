@@ -163,7 +163,11 @@ export default {
         timeZoneName: 'short'
       }).split(' ').pop();
       
-      sendWebhookNotifications(env, {
+      console.log('Sending webhook notifications for:', existing.recipient);
+      console.log('Slack URL exists:', !!env.SLACK_WEBHOOK_URL);
+      console.log('Discord URL exists:', !!env.DISCORD_WEBHOOK_URL);
+      
+      await sendWebhookNotifications(env, {
         recipient: existing.recipient,
         subject: existing.subject,
         opens: existing.opens,

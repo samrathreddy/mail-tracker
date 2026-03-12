@@ -2,6 +2,7 @@
 let serverUrl = '';
 let dashboardPassword = '';
 let currentPixelId = null;
+let authFailed = false; // Track if last auth failed
 
 // --- DOM refs ---
 const listView = document.getElementById('list-view');
@@ -19,11 +20,12 @@ function esc(str) {
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', async () => {
-  const { serverUrl: saved, dashboardPassword: savedPass } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword']);
+  const { serverUrl: saved, dashboardPassword: savedPass, authFailed: savedAuthFailed } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword', 'authFailed']);
   serverUrl = saved || '';
   dashboardPassword = savedPass || '';
+  authFailed = savedAuthFailed || false;
 
-  if (!serverUrl) {
+  if (!serverUrl || !dashboardPassword || authFailed) {
     showSetup(true);
   } else {
     loadPixels();
@@ -65,19 +67,55 @@ async function api(path) {
   if (dashboardPassword) {
     headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
   }
-  const res = await fetch(`${serverUrl}${path}`, { headers });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+  
+  try {
+    const res = await fetch(`${serverUrl}${path}`, { 
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (res.status === 401) {
+      // Authentication failed - clear stored password and show setup
+      authFailed = true;
+      dashboardPassword = ''; // Clear in memory
+      await chrome.storage.sync.set({ authFailed: true, dashboardPassword: '' });
+      showSetup(false);
+      throw new Error('Authentication required');
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timeout - check your password');
+    }
+    throw err;
+  }
 }
 
 // --- Views ---
-function showSetup(isFirst) {
+async function showSetup(isFirst) {
   setupView.style.display = 'block';
   listView.style.display = 'none';
   detailView.classList.remove('active');
   document.getElementById('setup-back-btn').style.display = isFirst ? 'none' : 'block';
-  document.getElementById('server-input').value = serverUrl;
-  document.getElementById('password-input').value = dashboardPassword;
+  
+  const serverInput = document.getElementById('server-input');
+  const passwordInput = document.getElementById('password-input');
+  
+  // Restore from temporary storage (persists across popup closes)
+  const { tempServerUrl, tempPassword } = await chrome.storage.local.get(['tempServerUrl', 'tempPassword']);
+  
+  serverInput.value = tempServerUrl || serverUrl;
+  passwordInput.value = tempPassword || dashboardPassword;
+  
+  // Save to temp storage on blur (when field loses focus)
+  serverInput.onblur = () => chrome.storage.local.set({ tempServerUrl: serverInput.value });
+  passwordInput.onblur = () => chrome.storage.local.set({ tempPassword: passwordInput.value });
 }
 
 function showList() {
@@ -248,10 +286,13 @@ async function loadPixels() {
     empty.className = 'empty';
     const icon = document.createElement('div');
     icon.style.fontSize = '24px';
-    icon.textContent = '\u26A0';
+    icon.textContent = '⚠️';
     const text = document.createElement('p');
-    text.style.color = '#ef4444';
-    text.textContent = `Can't reach server: ${err.message}`;
+    if (err.message === 'Authentication required') {
+      text.textContent = 'Password incorrect. Please update your settings.';
+    } else {
+      text.textContent = `Error: ${err.message}`;
+    }
     empty.appendChild(icon);
     empty.appendChild(text);
     pixelContainer.appendChild(empty);
@@ -314,7 +355,12 @@ async function saveSettings() {
 
   serverUrl = input;
   dashboardPassword = passwordInput;
-  await chrome.storage.sync.set({ serverUrl: input, dashboardPassword: passwordInput });
+  authFailed = false;
+  await chrome.storage.sync.set({ serverUrl: input, dashboardPassword: passwordInput, authFailed: false });
+  
+  // Clear temp storage after successful save
+  await chrome.storage.local.remove(['tempServerUrl', 'tempPassword']);
+  
   errorEl.style.display = 'none';
   showToast('Connected!');
 
