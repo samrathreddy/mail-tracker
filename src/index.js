@@ -3,6 +3,8 @@ const PIXEL = Uint8Array.from(atob(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRU5ErkJggg=='
 ), c => c.charCodeAt(0));
 
+import { sendWebhookNotifications } from './notifications.js';
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
@@ -147,6 +149,29 @@ export default {
       }
 
       await env.TRACKER.put(id, JSON.stringify(existing));
+      
+      // Send webhook notifications (non-blocking)
+      const timeStr = new Date(now).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      const timezone = new Date(now).toLocaleString('en-US', {
+        timeZoneName: 'short'
+      }).split(' ').pop();
+      
+      sendWebhookNotifications(env, {
+        recipient: existing.recipient,
+        subject: existing.subject,
+        opens: existing.opens,
+        country,
+        ip,
+        time: `${timeStr} (${timezone})`
+      });
+      
       return servePixel();
     }
 

@@ -132,6 +132,26 @@ When prompted, enter a secure password. This password will be required to:
 
 To verify: open `https://mail-tracker.YOUR-SUBDOMAIN.workers.dev` in your browser. You should be prompted for a password. Enter any username (it's ignored) and the password you just set.
 
+#### Step 8 — Set Up Webhook Notifications (Optional)
+
+Get real-time notifications on Slack or Discord when emails are opened:
+
+**For Slack:**
+1. Go to https://api.slack.com/messaging/webhooks
+2. Create a new webhook for your workspace
+3. Copy the webhook URL
+4. Run: `pnpm exec wrangler secret put SLACK_WEBHOOK_URL`
+5. Paste your webhook URL when prompted
+
+**For Discord:**
+1. Open your Discord server settings → Integrations → Webhooks
+2. Click "New Webhook"
+3. Copy the webhook URL
+4. Run: `pnpm exec wrangler secret put DISCORD_WEBHOOK_URL`
+5. Paste your webhook URL when prompted
+
+Now you'll get instant notifications with recipient, subject, location, and open count whenever someone opens your tracked emails!
+
 ---
 
 ### Part 2: Install the Chrome Extension
