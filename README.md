@@ -1,34 +1,149 @@
-# Mail Tracker
+# 📬 Mail Tracker
 
-A lightweight email open tracking service built with Cloudflare Workers + a Chrome extension.
+> **Know when your emails are opened — automatically, privately, and for free.**
 
-When you send an email from Gmail, the extension automatically injects an invisible 1x1 tracking pixel per recipient. When they open the email, you get a notification with their name, open count, location, and device.
+A lightweight email open tracking system with WhatsApp-style read receipts for Gmail. Built with Cloudflare Workers (serverless backend) + Chrome extension (auto-tracking).
 
-**✨ WhatsApp-Style Read Indicators:** See ✓ (sent) and ✓✓ (read) status next to recipients in your Gmail sent folder, with hover tooltips showing open count and timestamps.
-
-## How It Works
-
-```
-You send email in Gmail → extension auto-injects invisible pixel per recipient
-    → recipient opens email → pixel loads → worker logs IP, country, device, time
-    → extension polls worker → Chrome notification: "bob@test.com opened your email"
-```
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)](https://developer.chrome.com/docs/extensions/)
 
 ---
 
-## Full Installation Guide
+## ✨ Features
+
+- **🚀 Auto-tracking** — Invisible pixel injected automatically when you send Gmail emails
+- **✓✓ WhatsApp-style read indicators** — See ✓ (sent) and ✓✓ (read) next to recipients in Gmail
+- **🔔 Real-time notifications** — Chrome notifications + Slack/Discord webhooks when emails are opened
+- **🛡️ Privacy-first** — Self-hosted on your Cloudflare account, your data stays yours
+- **🤖 Bot filtering** — Automatically excludes Gmail Image Proxy, Outlook SafeLinks, and your own opens
+- **💰 100% free** — Runs on Cloudflare's generous free tier (100k requests/day)
+- **📊 Detailed analytics** — IP, country, device, timestamp for every open
+
+---
+
+## 🎬 Demo
+
+### WhatsApp-Style Read Indicators
+![Read indicators in Gmail](https://via.placeholder.com/800x400/34A853/FFFFFF?text=✓✓+Read+Indicators+Demo)
+
+### Chrome Notification
+![Chrome notification](https://via.placeholder.com/400x100/4285F4/FFFFFF?text=bob@test.com+opened+your+email)
+
+### Extension Dashboard
+![Extension popup](https://via.placeholder.com/400x600/EA4335/FFFFFF?text=Extension+Dashboard)
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-| Requirement | How to check | How to install |
-|-------------|-------------|----------------|
-| **Node.js** v18+ | `node -v` | [nodejs.org](https://nodejs.org/) |
-| **pnpm** | `pnpm -v` | `npm install -g pnpm` |
-| **Cloudflare account** (free) | — | [Sign up](https://dash.cloudflare.com/sign-up) |
-| **Chrome browser** | — | [Download](https://www.google.com/chrome/) |
-| **Gmail account** | — | Required for tracking |
+- Node.js v18+ ([install](https://nodejs.org/))
+- Free Cloudflare account ([sign up](https://dash.cloudflare.com/sign-up))
+- Chrome browser
+- Gmail account
+
+### Installation (5 minutes)
+
+**1. Clone and deploy backend:**
+
+```bash
+git clone https://github.com/samrathreddy/mail-tracker.git
+cd mail-tracker
+pnpm install
+pnpm exec wrangler login
+pnpm exec wrangler kv namespace create "TRACKER"
+# Copy the KV namespace ID from output
+cp wrangler.example.toml wrangler.toml
+# Edit wrangler.toml and paste your KV namespace ID
+pnpm run deploy
+# Save your worker URL: https://mail-tracker.YOUR-SUBDOMAIN.workers.dev
+```
+
+**2. Set password (optional but recommended):**
+
+```bash
+pnpm exec wrangler secret put DASHBOARD_PASSWORD
+# Enter a secure password when prompted
+```
+
+**3. Install Chrome extension:**
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked** → select `extension/` folder
+4. Click the extension icon → enter your worker URL and password → **Save & Connect**
+
+**4. Done!** Send a Gmail email and watch the magic happen ✨
 
 ---
+
+## 📖 How It Works
+
+```
+┌─────────────┐
+│ You compose │
+│ Gmail email │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Extension auto-injects      │
+│ invisible 1x1 tracking pixel│
+│ per recipient               │
+└──────┬──────────────────────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Recipient opens email       │
+│ → pixel loads               │
+└──────┬──────────────────────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Cloudflare Worker logs:     │
+│ • IP, country, device       │
+│ • Timestamp                 │
+│ • Filters bots & self-opens │
+└──────┬──────────────────────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ You get notified:           │
+│ • Chrome notification       │
+│ • Slack/Discord (optional)  │
+│ • ✓✓ in Gmail sent folder   │
+└─────────────────────────────┘
+```
+
+---
+
+## 🎯 Use Cases
+
+- **Sales & outreach** — Know when prospects open your cold emails
+- **Job applications** — See if recruiters opened your application
+- **Customer support** — Confirm customers received your response
+- **Personal** — Check if friends/family read your important emails
+- **Freelancers** — Track proposal and invoice opens
+
+---
+
+## 🆚 Why Mail Tracker?
+
+| Feature | Mail Tracker | Mailtrack.io | Yesware | HubSpot |
+|---------|:------------:|:------------:|:-------:|:-------:|
+| **Price** | Free | $9.99/mo | $15/mo | $45/mo |
+| **Privacy** | Self-hosted | Cloud | Cloud | Cloud |
+| **Auto-tracking** | ✅ | ✅ | ✅ | ✅ |
+| **Read indicators** | ✅ WhatsApp-style | ✅ | ❌ | ❌ |
+| **Webhooks** | ✅ Slack/Discord | ❌ | ✅ | ✅ |
+| **Bot filtering** | ✅ | ✅ | ✅ | ✅ |
+| **Open source** | ✅ AGPL-3.0 | ❌ | ❌ | ❌ |
+
+---
+
+## 📚 Full Documentation
 
 ### Part 1: Deploy the Backend (Cloudflare Worker)
 
