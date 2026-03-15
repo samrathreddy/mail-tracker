@@ -139,15 +139,17 @@ pnpm exec wrangler secret put DASHBOARD_PASSWORD
 
 ## 🆚 Why Mail Tracker?
 
-| Feature | Mail Tracker | Mailtrack.io | Yesware | HubSpot |
-|---------|:------------:|:------------:|:-------:|:-------:|
-| **Price** | Free | $9.99/mo | $15/mo | $45/mo |
-| **Privacy** | Self-hosted | Cloud | Cloud | Cloud |
-| **Auto-tracking** | ✅ | ✅ | ✅ | ✅ |
-| **Read indicators** | ✅ WhatsApp-style | ✅ | ❌ | ❌ |
-| **Webhooks** | ✅ Slack/Discord | ❌ | ✅ | ✅ |
-| **Bot filtering** | ✅ | ✅ | ✅ | ✅ |
-| **Open source** | ✅ AGPL-3.0 | ❌ | ❌ | ❌ |
+| Feature | Mail Tracker | Mailtrack | Streak | Superhuman | HubSpot |
+|---------|:------------:|:---------:|:------:|:----------:|:-------:|
+| **Price** | **Free forever** | $9.99/mo | $49/mo | $30/mo | $45/mo |
+| **Self-hosted** | ✅ Your infra | ❌ Cloud | ❌ Cloud | ❌ Cloud | ❌ Cloud |
+| **Open source** | ✅ AGPL-3.0 | ❌ | ❌ | ❌ | ❌ |
+| **No data collection** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Auto-tracking** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Read indicators** | ✅ WhatsApp-style | ✅ | ✅ | ✅ | ❌ |
+| **Slack/Discord webhooks** | ✅ | ❌ | ❌ | ❌ | ✅ |
+| **Bot filtering** | ✅ | ✅ Limited | ✅ Limited | ✅ | ✅ |
+| **Zero infrastructure** | ✅ CF free tier | N/A | N/A | N/A | N/A |
 
 ---
 
