@@ -2,6 +2,9 @@ import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, req
 import { sendWebhookNotifications, sendSequenceNotification } from './notifications.js';
 import { renderDetail } from './views/detail.js';
 import { renderDashboard } from './views/dashboard.js';
+import { renderSequencesPage } from './views/sequences-page.js';
+import { renderTemplatesPage } from './views/templates-page.js';
+import { renderAnalyticsPage } from './views/analytics-page.js';
 import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from './templates.js';
 import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
 import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
@@ -197,6 +200,28 @@ export default {
       const activeCount = results.filter(r => r.opens > 0).length;
 
       return html(renderDashboard(results, totalOpens, activeCount));
+    }
+
+    // === HTML VIEW ROUTES (must come before JSON API routes) ===
+
+    if (url.pathname === '/sequences' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
+      if (!checkAuth(request, env)) return requireAuth();
+      const sequences = await listSequences(env);
+      return html(renderSequencesPage(sequences));
+    }
+
+    if (url.pathname === '/templates' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
+      if (!checkAuth(request, env)) return requireAuth();
+      const templates = await listTemplates(env);
+      return html(renderTemplatesPage(templates));
+    }
+
+    if (url.pathname === '/analytics' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const analyticsKeys = await env.SEQUENCES.list({ prefix: 'analytics:' });
+      const analyticsData = await Promise.all(analyticsKeys.keys.map(k => env.SEQUENCES.get(k.name, 'json')));
+      const templates = await listTemplates(env);
+      return html(renderAnalyticsPage(analyticsData.filter(Boolean), templates));
     }
 
     // === TEMPLATE ROUTES ===
