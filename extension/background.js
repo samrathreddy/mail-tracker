@@ -47,12 +47,44 @@ async function pollForOpens() {
   }
 }
 
+async function pollSequenceStatus() {
+  const { serverUrl, dashboardPassword } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword']);
+  if (!serverUrl) return;
+
+  try {
+    const headers = {};
+    if (dashboardPassword) {
+      headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+    }
+    const res = await fetch(serverUrl + '/sequences?status=active', { headers });
+    if (!res.ok) return;
+    const sequences = await res.json();
+
+    const activeCount = sequences.length;
+    if (activeCount > 0) {
+      chrome.action.setBadgeText({ text: String(activeCount) });
+      chrome.action.setBadgeBackgroundColor({ color: '#6366f1' });
+    } else {
+      chrome.action.setBadgeText({ text: '' });
+    }
+  } catch { /* silent */ }
+}
+
 // Poll on alarm
 chrome.alarms.create('poll-opens', { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'poll-opens') pollForOpens();
+  if (alarm.name === 'poll-opens') {
+    pollForOpens();
+    pollSequenceStatus();
+  }
 });
 
 // Also poll on install/startup
-chrome.runtime.onStartup.addListener(pollForOpens);
-chrome.runtime.onInstalled.addListener(pollForOpens);
+chrome.runtime.onStartup.addListener(() => {
+  pollForOpens();
+  pollSequenceStatus();
+});
+chrome.runtime.onInstalled.addListener(() => {
+  pollForOpens();
+  pollSequenceStatus();
+});

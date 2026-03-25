@@ -3,7 +3,7 @@
   "name": "Mail Tracker",
   "description": "Track email opens in Gmail. Auto-injects invisible tracking pixel per recipient on Send.",
   "version": "1.1.0",
-  "permissions": ["storage", "notifications", "alarms"],
+  "permissions": ["storage", "notifications", "alarms", "identity"],
   "host_permissions": ["*://*/"],
   "action": {
     "default_popup": "popup.html",
