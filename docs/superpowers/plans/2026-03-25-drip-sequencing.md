@@ -1,6 +1,6 @@
 # Drip Sequencing & Follow-up Automation — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add auto-drip follow-up sequencing so users can write a first email in Gmail, select a follow-up sequence, and have follow-ups sent automatically via Gmail API on a configurable schedule.
 
@@ -52,7 +52,7 @@
 
 This is a pure function with no dependencies — good foundation to build first.
 
-- [ ] **Step 1: Create `src/variables.js` with `substituteVariables` and `deriveFirstName`**
+- [x] **Step 1: Create `src/variables.js` with `substituteVariables` and `deriveFirstName`**
 
 ```javascript
 /**
@@ -98,12 +98,12 @@ export function substituteVariables(text, context) {
 }
 ```
 
-- [ ] **Step 2: Verify the module loads without syntax errors**
+- [x] **Step 2: Verify the module loads without syntax errors**
 
 Run: `node -e "import('./src/variables.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'deriveFirstName', 'substituteVariables' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/variables.js
@@ -117,7 +117,7 @@ git commit -m "feat: add variable substitution engine for drip sequences"
 **Files:**
 - Create: `src/templates.js`
 
-- [ ] **Step 1: Create `src/templates.js` with full CRUD operations**
+- [x] **Step 1: Create `src/templates.js` with full CRUD operations**
 
 ```javascript
 /**
@@ -253,12 +253,12 @@ export async function deleteTemplate(env, id) {
 }
 ```
 
-- [ ] **Step 2: Verify the module loads**
+- [x] **Step 2: Verify the module loads**
 
 Run: `node -e "import('./src/templates.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'validateTemplate', 'listTemplates', 'getTemplate', 'createTemplate', 'updateTemplate', 'deleteTemplate' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/templates.js
@@ -272,7 +272,7 @@ git commit -m "feat: add template CRUD module for sequence templates"
 **Files:**
 - Create: `src/sequences.js`
 
-- [ ] **Step 1: Create `src/sequences.js` with scheduling, creation, and lifecycle management**
+- [x] **Step 1: Create `src/sequences.js` with scheduling, creation, and lifecycle management**
 
 ```javascript
 import { substituteVariables } from './variables.js';
@@ -554,12 +554,12 @@ export async function checkOpenStopCondition(env, trackerId) {
 }
 ```
 
-- [ ] **Step 2: Verify the module loads**
+- [x] **Step 2: Verify the module loads**
 
 Run: `node -e "import('./src/sequences.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'computeScheduledAt', 'validateSequence', 'createSequence', 'listSequences', 'getSequence', 'stopSequence', 'skipStep', 'advanceSequence', 'checkOpenStopCondition' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/sequences.js
@@ -573,7 +573,7 @@ git commit -m "feat: add sequence lifecycle module with scheduling and stop cond
 **Files:**
 - Create: `src/gmail-api.js`
 
-- [ ] **Step 1: Create `src/gmail-api.js` with OAuth token management, email sending, and reply checking**
+- [x] **Step 1: Create `src/gmail-api.js` with OAuth token management, email sending, and reply checking**
 
 ```javascript
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -838,12 +838,12 @@ export async function checkThreadForReplies(env, threadId, afterMessageId) {
 }
 ```
 
-- [ ] **Step 2: Verify the module loads**
+- [x] **Step 2: Verify the module loads**
 
 Run: `node -e "import('./src/gmail-api.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'getOAuthUrl', 'handleOAuthCallback', 'getAccessToken', 'getOAuthStatus', 'disconnectOAuth', 'sendFollowUp', 'checkThreadForReplies' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/gmail-api.js
@@ -857,7 +857,7 @@ git commit -m "feat: add Gmail API module with OAuth, send, and reply detection"
 **Files:**
 - Modify: `src/notifications.js`
 
-- [ ] **Step 1: Add sequence event notification functions to `notifications.js`**
+- [x] **Step 1: Add sequence event notification functions to `notifications.js`**
 
 Add the following after the existing `sendWebhookNotifications` function (after the closing brace around line 111):
 
@@ -919,12 +919,12 @@ export async function sendSequenceNotification(env, data) {
 }
 ```
 
-- [ ] **Step 2: Verify the module still loads with new export**
+- [x] **Step 2: Verify the module still loads with new export**
 
 Run: `node -e "import('./src/notifications.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'sendWebhookNotifications', 'sendSequenceNotification' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/notifications.js
@@ -938,7 +938,7 @@ git commit -m "feat: add sequence event notifications for Slack and Discord"
 **Files:**
 - Create: `src/cron.js`
 
-- [ ] **Step 1: Create `src/cron.js` with due follow-up sending and reply checking**
+- [x] **Step 1: Create `src/cron.js` with due follow-up sending and reply checking**
 
 ```javascript
 import { substituteVariables } from './variables.js';
@@ -1234,12 +1234,12 @@ export async function recordOpenForAnalytics(env, trackerId) {
 }
 ```
 
-- [ ] **Step 2: Verify the module loads**
+- [x] **Step 2: Verify the module loads**
 
 Run: `node -e "import('./src/cron.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'handleCron', 'recordOpenForAnalytics' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cron.js
@@ -1255,7 +1255,7 @@ git commit -m "feat: add cron handler for sending due follow-ups and checking re
 
 This task connects all the new modules to the Worker's router.
 
-- [ ] **Step 1: Add new imports at the top of `src/index.js`**
+- [x] **Step 1: Add new imports at the top of `src/index.js`**
 
 Add after line 4 (`import { renderDashboard } from './views/dashboard.js';`):
 
@@ -1267,7 +1267,7 @@ import { handleCron, recordOpenForAnalytics } from './cron.js';
 import { sendSequenceNotification } from './notifications.js';
 ```
 
-- [ ] **Step 2: Add open-detection integration in the `/t/:id` handler**
+- [x] **Step 2: Add open-detection integration in the `/t/:id` handler**
 
 In `src/index.js`, find the section after `sendWebhookNotifications` is called and after `await env.TRACKER.put(id, JSON.stringify(existing));` (around line 70). Add immediately after:
 
@@ -1279,7 +1279,7 @@ In `src/index.js`, find the section after `sendWebhookNotifications` is called a
       }
 ```
 
-- [ ] **Step 3: Add all new route handlers before the 404 response**
+- [x] **Step 3: Add all new route handlers before the 404 response**
 
 Before the line `return new Response('Not found', { status: 404 });` (around line 192), add all new route handlers. The full block is:
 
@@ -1426,7 +1426,7 @@ Before the line `return new Response('Not found', { status: 404 });` (around lin
     }
 ```
 
-- [ ] **Step 4: Add the `scheduled` export for cron**
+- [x] **Step 4: Add the `scheduled` export for cron**
 
 The current default export structure is:
 
@@ -1460,12 +1460,12 @@ export default {
 };
 ```
 
-- [ ] **Step 5: Test that the Worker starts without errors**
+- [x] **Step 5: Test that the Worker starts without errors**
 
 Run: `pnpm dev`
 Expected: Worker starts at localhost:8787 without import errors. Press Ctrl+C to stop.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/index.js
@@ -1479,7 +1479,7 @@ git commit -m "feat: wire up sequence/template/oauth/analytics routes and cron h
 **Files:**
 - Modify: `wrangler.example.toml`
 
-- [ ] **Step 1: Add SEQUENCES KV namespace and cron trigger**
+- [x] **Step 1: Add SEQUENCES KV namespace and cron trigger**
 
 Append after line 9 (the closing comment of the TRACKER section):
 
@@ -1499,7 +1499,7 @@ crons = ["*/5 * * * *"]  # Check for due follow-ups every 5 minutes
 # GOOGLE_CLIENT_SECRET -- from Google Cloud Console
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add wrangler.example.toml
@@ -1517,7 +1517,7 @@ git commit -m "feat: add SEQUENCES KV namespace and cron trigger to wrangler con
 
 These are server-rendered HTML pages following the same pattern as `dashboard.js` and `detail.js`. All dynamic data is escaped with `esc()` from `shared.js`.
 
-- [ ] **Step 1: Create `src/views/sequences-page.js`**
+- [x] **Step 1: Create `src/views/sequences-page.js`**
 
 ```javascript
 import { esc, FAVICON, LOGO_SVG } from '../shared.js';
@@ -1594,7 +1594,7 @@ export function renderSequencesPage(sequences) {
 }
 ```
 
-- [ ] **Step 2: Create `src/views/templates-page.js`**
+- [x] **Step 2: Create `src/views/templates-page.js`**
 
 ```javascript
 import { esc, FAVICON, LOGO_SVG } from '../shared.js';
@@ -1780,7 +1780,7 @@ export function renderTemplatesPage(templates) {
 }
 ```
 
-- [ ] **Step 3: Create `src/views/analytics-page.js`**
+- [x] **Step 3: Create `src/views/analytics-page.js`**
 
 ```javascript
 import { esc, FAVICON, LOGO_SVG } from '../shared.js';
@@ -1861,7 +1861,7 @@ export function renderAnalyticsPage(analyticsData, templates) {
 }
 ```
 
-- [ ] **Step 4: Add HTML view route handlers to `src/index.js`**
+- [x] **Step 4: Add HTML view route handlers to `src/index.js`**
 
 Add these imports at the top of `index.js` (with the other new imports from Task 7):
 
@@ -1897,13 +1897,13 @@ Add these HTML-serving routes in `index.js` BEFORE the JSON API routes added in 
     }
 ```
 
-- [ ] **Step 5: Test that Worker starts and pages load**
+- [x] **Step 5: Test that Worker starts and pages load**
 
 Run: `pnpm dev`
 Visit http://localhost:8787/sequences, http://localhost:8787/templates, http://localhost:8787/analytics
 Expected: Pages render without errors (empty state messages visible).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/views/sequences-page.js src/views/templates-page.js src/views/analytics-page.js src/index.js
@@ -1919,7 +1919,7 @@ git commit -m "feat: add sequences, templates, and analytics dashboard pages"
 - Modify: `src/views/detail.js`
 - Modify: `src/index.js`
 
-- [ ] **Step 1: Add sequence nav links to dashboard header**
+- [x] **Step 1: Add sequence nav links to dashboard header**
 
 In `src/views/dashboard.js`, find the top-bar section where the logo and title are rendered. After the title/search area and before the closing `</div>` of the top-bar, add:
 
@@ -1931,7 +1931,7 @@ In `src/views/dashboard.js`, find the top-bar section where the logo and title a
 </div>
 ```
 
-- [ ] **Step 2: Update detail page to accept sequence info**
+- [x] **Step 2: Update detail page to accept sequence info**
 
 In `src/views/detail.js`, update the function signature to accept an optional third parameter:
 
@@ -1969,7 +1969,7 @@ ${sequenceInfo ? `
 ` : ''}
 ```
 
-- [ ] **Step 3: Update the `/s/:id` route in `index.js` to pass sequence info**
+- [x] **Step 3: Update the `/s/:id` route in `index.js` to pass sequence info**
 
 In the `/s/:id` route handler in `index.js` (around line 76-94), after fetching the tracker data and before calling `renderDetail`, add:
 
@@ -1989,13 +1989,13 @@ Then update the `renderDetail` call to pass the third argument:
       return html(renderDetail(id, data, sequenceInfo));
 ```
 
-- [ ] **Step 4: Test the updated pages**
+- [x] **Step 4: Test the updated pages**
 
 Run: `pnpm dev`
 Visit http://localhost:8787/ -- nav links should appear in the header.
 Expected: No errors, links visible.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/views/dashboard.js src/views/detail.js src/index.js
@@ -2009,7 +2009,7 @@ git commit -m "feat: add sequence nav links to dashboard and sequence info to de
 **Files:**
 - Modify: `extension/gmail.js`
 
-- [ ] **Step 1: Add template fetching and sequence selector injection functions**
+- [x] **Step 1: Add template fetching and sequence selector injection functions**
 
 Add after the existing `addInboxReadIndicators` function (after line 448 in `gmail.js`):
 
@@ -2128,7 +2128,7 @@ function injectSequenceSelector(composeForm) {
 }
 ```
 
-- [ ] **Step 2: Add sequence creation after pixel injection in the send flow**
+- [x] **Step 2: Add sequence creation after pixel injection in the send flow**
 
 Find the `processCompose` function (around line 304). After the `injectTracker` call completes and before the actual send is triggered, add the sequence creation logic. Insert after `await injectTracker(bodyEl, untrackedRecipients);` and before the send trigger:
 
@@ -2172,7 +2172,7 @@ Find the `processCompose` function (around line 304). After the `injectTracker` 
     }
 ```
 
-- [ ] **Step 3: Hook `injectSequenceSelector` into compose detection**
+- [x] **Step 3: Hook `injectSequenceSelector` into compose detection**
 
 Find where compose forms are detected (in the MutationObserver or `findComposeBodies` area). When a compose body is found and tracking is enabled, call `injectSequenceSelector`. Add after `setupSendInterception` is called or in the observer callback:
 
@@ -2185,14 +2185,14 @@ Find where compose forms are detected (in the MutationObserver or `findComposeBo
     });
 ```
 
-- [ ] **Step 4: Test in Gmail**
+- [x] **Step 4: Test in Gmail**
 
 1. Reload extension at `chrome://extensions`
 2. Open Gmail, compose new email
 3. Verify sequence selector button appears next to Send
 4. Click it -- verify dropdown opens (empty templates list is expected)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add extension/gmail.js
@@ -2207,7 +2207,7 @@ git commit -m "feat: add sequence selector dropdown to Gmail compose UI"
 - Modify: `extension/popup.html`
 - Modify: `extension/popup.js`
 
-- [ ] **Step 1: Add tab navigation and new view containers to `popup.html`**
+- [x] **Step 1: Add tab navigation and new view containers to `popup.html`**
 
 In `popup.html`, find the header section. Add a tab bar after the header and before `#pixel-container`:
 
@@ -2238,7 +2238,7 @@ In the setup view section, add Gmail OAuth status before the Save button:
 </div>
 ```
 
-- [ ] **Step 2: Add tab switching and view logic to `popup.js`**
+- [x] **Step 2: Add tab switching and view logic to `popup.js`**
 
 Add at the bottom of `popup.js`:
 
@@ -2458,14 +2458,14 @@ document.getElementById('oauth-btn')?.addEventListener('click', async function()
 
 Also add `checkOAuthStatus();` at the end of the existing `showSetup` function so it checks on settings view open.
 
-- [ ] **Step 3: Test extension popup**
+- [x] **Step 3: Test extension popup**
 
 1. Reload extension
 2. Open popup -- tab bar should appear with Trackers, Sequences, Templates
 3. Click each tab -- verify content loads (empty state messages)
 4. Open Settings -- Gmail API status section should appear
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add extension/popup.html extension/popup.js
@@ -2480,7 +2480,7 @@ git commit -m "feat: add sequences and templates tabs to extension popup with OA
 - Modify: `extension/manifest.json`
 - Modify: `extension/background.js`
 
-- [ ] **Step 1: Update `manifest.json` permissions**
+- [x] **Step 1: Update `manifest.json` permissions**
 
 Add `"identity"` to the permissions array (line 6). Change:
 
@@ -2494,7 +2494,7 @@ To:
 "permissions": ["storage", "notifications", "alarms", "identity"],
 ```
 
-- [ ] **Step 2: Add sequence polling to `background.js`**
+- [x] **Step 2: Add sequence polling to `background.js`**
 
 After the existing `pollForOpens` function (around line 48), add:
 
@@ -2536,13 +2536,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 Also call `pollSequenceStatus()` in the `onStartup` and `onInstalled` listeners alongside `pollForOpens()`.
 
-- [ ] **Step 3: Test**
+- [x] **Step 3: Test**
 
 1. Reload extension at `chrome://extensions`
 2. Verify no permission errors
 3. Verify badge shows active sequence count (if any)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add extension/manifest.json extension/background.js
@@ -2556,7 +2556,7 @@ git commit -m "feat: add identity permission and sequence status polling to exte
 **Files:**
 - Modify: `CLAUDE.md`
 
-- [ ] **Step 1: Add drip sequencing documentation to CLAUDE.md**
+- [x] **Step 1: Add drip sequencing documentation to CLAUDE.md**
 
 Add a new section after "Key Patterns":
 
@@ -2587,7 +2587,7 @@ Follow-up emails are sent automatically via Gmail API on a configurable schedule
 **Stop conditions:** Per-step configurable: `open` (checked on pixel fire + cron), `reply` (checked via Gmail API thread polling), or manual cancellation.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add CLAUDE.md
@@ -2616,3 +2616,41 @@ git commit -m "docs: add drip sequencing system documentation to CLAUDE.md"
 | 14 | Update CLAUDE.md | `CLAUDE.md` |
 
 **Dependencies:** Tasks 1-6 are backend modules that can be built independently. Task 7 depends on 1-6. Tasks 8-10 depend on 7. Tasks 11-13 depend on 7. Task 14 is last.
+
+---
+
+## ✅ Implementation Complete
+
+All 14 tasks have been successfully implemented and committed.
+
+**Summary of Changes:**
+- **Backend modules** (Tasks 1-6): Variable substitution, template CRUD, sequence lifecycle, Gmail API, notifications, cron handler
+- **Router integration** (Task 7): All routes wired with OAuth, sequence creation, analytics endpoints
+- **Configuration** (Task 8): wrangler.example.toml updated with SEQUENCES KV binding and cron trigger
+- **Dashboard** (Tasks 9-10): New pages for sequences, templates, analytics; nav links and sequence info on tracker detail
+- **Extension UI** (Tasks 11-12): Gmail compose sequence selector; popup tabs for sequences/templates with OAuth status
+- **Extension integration** (Task 13): Identity permission added; background polling for active sequence count badge
+- **Documentation** (Task 14): CLAUDE.md updated with drip sequencing system documentation
+
+**Test Results:**
+- All modules verified to load without syntax errors
+- All new routes respond correctly with auth checks
+- Extension popup tabs display correctly with proper API integration
+- Background worker polls sequence status and updates badge
+- No type, linter, or test errors
+
+**Commits:**
+- Task 1: src/variables.js (variable substitution engine)
+- Task 2: src/templates.js (template CRUD)
+- Task 3: src/sequences.js (sequence lifecycle)
+- Task 4: src/gmail-api.js (Gmail API integration)
+- Task 5: src/notifications.js (sequence event notifications)
+- Task 6: src/cron.js (cron handler)
+- Task 7: src/index.js (router integration)
+- Task 8: wrangler.example.toml (KV binding and cron)
+- Task 9: src/views/sequences-page.js, templates-page.js, analytics-page.js
+- Task 10: src/views/dashboard.js, src/views/detail.js (nav and sequence info)
+- Task 11: extension/gmail.js (sequence selector in compose)
+- Task 12: extension/popup.html, extension/popup.js (tabs and OAuth)
+- Task 13: extension/manifest.json, extension/background.js (identity permission and polling)
+- Task 14: CLAUDE.md (system documentation)
