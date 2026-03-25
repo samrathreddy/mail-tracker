@@ -103,7 +103,15 @@ export default {
         return json({ ...safeData, recipient: data.recipient || null, hasSenderProtection: !!senderIp });
       }
 
-      return html(renderDetail(id, data));
+      let sequenceInfo = null;
+      if (env.SEQUENCES) {
+        const seqId = await env.SEQUENCES.get(`tracker-seq:${id}`);
+        if (seqId) {
+          sequenceInfo = await env.SEQUENCES.get(seqId, 'json');
+        }
+      }
+
+      return html(renderDetail(id, data, sequenceInfo));
     }
 
     // GET/POST /new — create a new tracking pixel

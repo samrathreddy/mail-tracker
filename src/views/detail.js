@@ -1,6 +1,6 @@
 import { esc, FAVICON } from '../shared.js';
 
-export function renderDetail(id, data) {
+export function renderDetail(id, data, sequenceInfo) {
   const events = data.events || [];
   const filteredEvents = data.filteredEvents || [];
   const recipient = data.recipient || id;
@@ -140,6 +140,32 @@ export function renderDetail(id, data) {
       <div class="stat-card"><div class="stat-label">First Open</div><div class="stat-value blue" style="font-size:1rem" id="statFirst"></div><div class="stat-sub" id="statFirstSub"></div></div>
       <div class="stat-card"><div class="stat-label">Last Open</div><div class="stat-value blue" style="font-size:1rem" id="statLast"></div><div class="stat-sub" id="statLastSub"></div></div>
     </div>
+
+    ${sequenceInfo ? `
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;">
+        <h3 style="color:var(--text);font-size:15px;margin-bottom:12px;">Sequence</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
+            <div style="color:var(--text-3);font-size:11px;">Status</div>
+            <div style="color:var(--text);font-size:14px;">${esc(sequenceInfo.status)}</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
+            <div style="color:var(--text-3);font-size:11px;">Progress</div>
+            <div style="color:var(--text);font-size:14px;">Step ${sequenceInfo.currentStep}/${sequenceInfo.steps.length}</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
+            <div style="color:var(--text-3);font-size:11px;">Timezone</div>
+            <div style="color:var(--text);font-size:14px;">${esc(sequenceInfo.timezone)}</div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);">
+          ${sequenceInfo.steps.map((s, i) => {
+            const icon = s.status === 'sent' ? 'Sent' : s.status === 'pending' ? 'Pending' : s.status === 'skipped' ? 'Skipped' : s.status === 'failed' ? 'Failed' : '-';
+            return '<div style="padding:4px 0;">[' + esc(icon) + '] Step ' + (i + 1) + ': Day ' + s.delayDays + ' - ' + esc(s.subject.substring(0, 60)) + (s.sentAt ? ' (sent ' + esc(new Date(s.sentAt).toLocaleString()) + ')' : '') + '</div>';
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
 
     <div class="two-col">
       <div class="panel"><div class="panel-header"><span class="panel-title">Open Activity</span><span class="panel-hint" id="calRange"></span></div><div class="panel-body"><div class="cal-wrap" id="calWrap"></div><div class="cal-legend" id="calLegend"></div></div></div>

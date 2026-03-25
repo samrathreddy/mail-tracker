@@ -68,6 +68,11 @@ export function renderDashboard(results, totalOpens, activeCount) {
 <body>
   <div class="top-bar">
     <div class="brand">${LOGO_SVG} Mail Tracker</div>
+    <div style="display:flex;gap:12px;margin-left:auto;font-size:14px;">
+      <a href="/sequences" style="color:#818cf8;text-decoration:none;">Sequences</a>
+      <a href="/templates" style="color:#818cf8;text-decoration:none;">Templates</a>
+      <a href="/analytics" style="color:#818cf8;text-decoration:none;">Analytics</a>
+    </div>
     <button class="new-btn" id="newBtn">+ New Tracker</button>
   </div>
   <div class="container">
