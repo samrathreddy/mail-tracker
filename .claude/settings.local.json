@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/beckett/Projects/github_clones/mail-tracker -type f -name wrangler*.toml)"
+    ]
+  }
+}

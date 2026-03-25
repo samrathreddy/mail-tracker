@@ -1,116 +1,79 @@
-# Mail Tracker - Project Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Overview
 
-Email open tracking service. Embeds a 1x1 transparent PNG pixel in emails — when the recipient opens the email, the pixel fires a request that records the open. Built with a Cloudflare Worker backend and Chrome extension frontend.
-
-## Architecture
-
-```
-mail-tracker/
-├── src/
-│   ├── index.js            # Worker entry — router & API handlers
-│   ├── shared.js           # Constants, helpers, auth, pixel serving
-│   ├── notifications.js    # Slack/Discord webhook dispatch
-│   └── views/
-│       ├── dashboard.js    # Main listing page (GET /)
-│       └── detail.js       # Individual tracker page (GET /s/:id)
-├── extension/              # Chrome Extension (Manifest V3)
-│   ├── manifest.json
-│   ├── popup.html / popup.js
-│   ├── background.js       # Service worker — polling & notifications
-│   ├── gmail.js            # Content script — auto-injects pixel on Send
-│   └── icons/
-├── wrangler.toml           # Cloudflare Workers config (KV binding)
-└── package.json
-```
-
-## Tech Stack
-
-- **Runtime**: Cloudflare Workers (V8 isolate, no Node.js APIs)
-- **Storage**: Cloudflare KV (bound as `TRACKER`)
-- **Frontend**: Chrome Extension (Manifest V3), vanilla JS
-- **Package manager**: pnpm
-- **No frameworks, no build step, no npm runtime deps**
+Email open tracking service: 1x1 transparent PNG pixel embedded in emails, Cloudflare Worker records opens. Chrome extension auto-injects pixels in Gmail.
 
 ## Commands
 
 - `pnpm dev` — local dev server at http://localhost:8787
-- `pnpm run deploy` — deploy to Cloudflare (note: `pnpm run deploy`, not `pnpm deploy`)
+- `pnpm run deploy` — deploy to Cloudflare (**must** use `pnpm run deploy`, not `pnpm deploy`)
 
-## API Endpoints
+No test framework, no linter, no build step.
 
-| Route | Method | Auth | Description |
-|-------|--------|------|-------------|
-| `/` | GET | Yes | Web dashboard — lists all trackers |
-| `/t/:id` | GET | No | Serve tracking pixel & record open |
-| `/s/:id` | GET | Yes | Tracker detail page (HTML) or stats (JSON with `?format=json`) |
-| `/new` | GET/POST | Yes | Create new pixel. POST accepts `{ to, subject, bodyPreview, messageId }` |
-| `/list` | GET | Yes | List all pixels as JSON (used by extension) |
-| `/d/:id` | GET | Yes | Delete a pixel |
+## Architecture
 
-Auth uses HTTP Basic with `DASHBOARD_PASSWORD` env var. If unset, all routes are open.
+**Backend** (`src/`): Cloudflare Worker, vanilla JS, no Node.js APIs available.
 
-## Storage Schema
+- `index.js` — Worker entry point, request router, all API handlers
+- `shared.js` — Constants (PIXEL, CORS_HEADERS, BOT_PATTERNS), helpers (`json()`, `esc()`, `checkAuth()`), pixel serving
+- `notifications.js` — Slack/Discord webhook dispatch
+- `views/dashboard.js` — HTML generation for GET / (main listing)
+- `views/detail.js` — HTML generation for GET /s/:id (individual tracker)
 
-Each pixel in KV (key = 8-char UUID):
-```json
-{
-  "opens": 5,
-  "skipped": 2,
-  "senderIp": "...",
-  "recipient": "user@example.com",
-  "subject": "...",
-  "bodyPreview": "...",
-  "messageId": "...",
-  "createdAt": "ISO-8601",
-  "events": [
-    { "time": "ISO-8601", "ip": "...", "country": "US", "userAgent": "..." }
-  ],
-  "filteredEvents": [
-    { "time": "ISO-8601", "ip": "...", "reason": "sender_ip|bot_proxy" }
-  ]
-}
-```
-- `events` capped at 100, `filteredEvents` capped at 20
+**Extension** (`extension/`): Chrome Manifest V3, vanilla JS.
 
-## Open Filtering Pipeline
+- `gmail.js` — Content script injected into Gmail; hooks Send button to auto-inject tracking pixels (one per recipient)
+- `background.js` — Service worker; polls worker for new opens, fires Chrome notifications
+- `popup.js` / `popup.html` — Extension popup UI
 
-Three filters run before recording an open:
-1. **Sender IP** — skips if opener IP matches creator IP
-2. **Bot detection** — regex patterns for known email proxies (Outlook SafeLinks, Yahoo, etc.)
-3. **Dedup window** — ignores same-IP opens within 5 seconds
+**Storage**: Cloudflare KV (binding name `TRACKER`). Each tracker keyed by 8-char UUID. Config in `wrangler.toml` (gitignored; `wrangler.example.toml` is the template).
+
+## Key Patterns
+
+**Open filtering pipeline** (in `index.js`, `/t/:id` handler): Three filters run in order before counting an open:
+1. Sender IP match → skip
+2. Bot/proxy user-agent regex (`BOT_PATTERNS` in `shared.js`) → skip
+3. Same-IP dedup within 5 seconds → skip
+
+Filtered hits go to `filteredEvents` (capped at 20); real opens go to `events` (capped at 100).
+
+**Auth**: HTTP Basic using `DASHBOARD_PASSWORD` env var. `/t/:id` is always unauthenticated (must be, so email clients can load the pixel).
+
+**Notifications**: `sendWebhookNotifications()` dispatches to Slack/Discord webhooks after a real open is recorded. Webhook URLs come from `SLACK_WEBHOOK_URL` / `DISCORD_WEBHOOK_URL` secrets.
 
 ## Code Conventions
 
-### General
-- No frameworks or build tools — vanilla JS everywhere
-- Keep modules focused: router logic in `index.js`, HTML generation in `views/`, reusable bits in `shared.js`
-- All timezone-dependent computations (hourly chart, calendar heatmap) happen **client-side** so they match the viewer's local time
-- Webhook notifications are dispatched in `notifications.js`
+- No frameworks, no build tools, no npm runtime deps — vanilla JS only
+- Views generate HTML strings server-side; all timezone-dependent computations (hourly chart, calendar heatmap) happen **client-side** in embedded `<script>` tags
+- Escape dynamic data in HTML templates with `esc()` from `shared.js` — never use raw string interpolation for user data
+- Use DOM APIs (`createElement`, `textContent`) in extension code — never `innerHTML` with dynamic data
+- All API responses include CORS headers (for extension compatibility)
+- Dark theme with zinc/indigo/emerald palette across dashboard and extension
+- Inline SVG for favicon and logo — no external asset dependencies
 
-### Security
-- Use DOM APIs (`createElement`, `textContent`) — never `innerHTML` with dynamic data
-- Escape all server-injected strings in HTML templates with `esc()` from `shared.js`
-- All API responses include CORS headers for extension compatibility
-- Validate inputs at API boundaries (email format, string length limits)
+## API Routes
 
-### UI
-- Dark theme (zinc/indigo/emerald palette) across dashboard and extension
-- Inline SVG favicon and logo — no external asset dependencies
-- Dashboard features: search/filter, card-based list, create modal
-- Detail page features: stats grid, calendar heatmap, peak hours grid, event timeline with tabs
+| Route | Method | Auth | Purpose |
+|-------|--------|------|---------|
+| `/` | GET | Yes | Web dashboard |
+| `/t/:id` | GET | No | Tracking pixel endpoint |
+| `/s/:id` | GET | Yes | Tracker detail (HTML) or stats (JSON with `?format=json`) |
+| `/new` | GET/POST | Yes | Create pixel. POST body: `{ to, subject, bodyPreview, messageId }` |
+| `/list` | GET | Yes | List all pixels as JSON |
+| `/d/:id` | GET | Yes | Delete pixel |
 
-### Extension
-- Gmail content script (`gmail.js`) hooks Send button to auto-inject tracking pixels
-- Per-recipient tracking: each recipient gets their own pixel ID
-- Background service worker polls for new opens
+## Storage Schema
 
-## Setup
-
-1. Cloudflare account with Workers + KV enabled
-2. Set KV namespace ID in `wrangler.toml`
-3. `pnpm install` then `pnpm run deploy`
-4. Optionally set `DASHBOARD_PASSWORD` secret: `npx wrangler secret put DASHBOARD_PASSWORD`
-5. Optionally set `SLACK_WEBHOOK_URL` / `DISCORD_WEBHOOK_URL` for notifications
-6. Load `extension/` as unpacked extension in Chrome
+KV value per tracker (key = 8-char UUID):
+```json
+{
+  "opens": 5, "skipped": 2,
+  "senderIp": "...", "recipient": "...", "subject": "...",
+  "bodyPreview": "...", "messageId": "...", "createdAt": "ISO-8601",
+  "events": [{ "time": "ISO-8601", "ip": "...", "country": "US", "userAgent": "..." }],
+  "filteredEvents": [{ "time": "ISO-8601", "ip": "...", "reason": "sender_ip|bot_proxy" }]
+}
+```
