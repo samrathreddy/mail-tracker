@@ -109,3 +109,59 @@ export async function sendWebhookNotifications(env, data) {
     console.log('No webhooks configured');
   }
 }
+
+/**
+ * Send notification for sequence events (follow-up sent, stopped, failed, etc.)
+ */
+export async function sendSequenceNotification(env, data) {
+  const { type, recipient, subject, stepNumber, totalSteps, reason } = data;
+
+  const messages = {
+    'follow-up-sent': `Follow-up Sent (Step ${stepNumber}/${totalSteps})\n\nTo: ${recipient}\nSubject: ${subject}`,
+    'sequence-completed': `Sequence Completed (All ${totalSteps} steps sent)\n\nTo: ${recipient}\nSubject: ${subject}`,
+    'sequence-stopped': `Sequence Stopped - ${reason}\n\nTo: ${recipient}\nSubject: ${subject}`,
+    'step-failed': `Step Failed (Step ${stepNumber}/${totalSteps})\n\nTo: ${recipient}\nSubject: ${subject}\nReason: ${reason}`,
+    'oauth-error': `Gmail OAuth Error\n\nAll sequences paused. Please reconnect Gmail.\nError: ${reason}`,
+  };
+
+  const text = messages[type] || `Sequence event: ${type}`;
+
+  const promises = [];
+
+  if (env.SLACK_WEBHOOK_URL) {
+    promises.push(
+      fetch(env.SLACK_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }).catch(() => {})
+    );
+  }
+
+  if (env.DISCORD_WEBHOOK_URL) {
+    const colors = {
+      'follow-up-sent': 0x3B82F6,
+      'sequence-completed': 0x22C55E,
+      'sequence-stopped': 0xEAB308,
+      'step-failed': 0xEF4444,
+      'oauth-error': 0xEF4444,
+    };
+
+    promises.push(
+      fetch(env.DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          embeds: [{
+            title: text.split('\n')[0],
+            description: text.split('\n').slice(1).join('\n'),
+            color: colors[type] || 0x6366F1,
+            timestamp: new Date().toISOString(),
+          }],
+        }),
+      }).catch(() => {})
+    );
+  }
+
+  await Promise.all(promises);
+}
