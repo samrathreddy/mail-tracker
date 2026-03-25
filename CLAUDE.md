@@ -44,6 +44,31 @@ Filtered hits go to `filteredEvents` (capped at 20); real opens go to `events` (
 
 **Notifications**: `sendWebhookNotifications()` dispatches to Slack/Discord webhooks after a real open is recorded. Webhook URLs come from `SLACK_WEBHOOK_URL` / `DISCORD_WEBHOOK_URL` secrets.
 
+## Drip Sequencing System
+
+Follow-up emails are sent automatically via Gmail API on a configurable schedule.
+
+**KV Namespaces:**
+- `TRACKER` — pixel tracking data (existing)
+- `SEQUENCES` — sequence templates, active sequences, OAuth tokens, analytics (prefixed keys: `tmpl:`, `seq:`, `oauth:`, `analytics:`, `cron:`, `tracker-seq:`)
+
+**New modules:**
+- `src/templates.js` — Template CRUD
+- `src/sequences.js` — Sequence lifecycle (create, advance, stop, schedule computation)
+- `src/gmail-api.js` — OAuth token management, Gmail send/reply-check
+- `src/cron.js` — Cron handler dispatched every 5 min
+- `src/variables.js` — `{{variable}}` substitution engine
+
+**New dashboard pages:** `/sequences`, `/templates`, `/analytics` (in `src/views/`)
+
+**Gmail OAuth:** Tokens stored in `SEQUENCES` KV. Secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` via `wrangler secret put`.
+
+**Cron:** `*/5 * * * *` — sends due follow-ups and checks threads for replies (reply check throttled to every 15 min). 30-second execution limit; batches with cursor if needed.
+
+**Timezone:** Scheduling uses `Intl.DateTimeFormat` with 8am-6pm send window per sequence timezone. Outside window -> snaps to 9am next day.
+
+**Stop conditions:** Per-step configurable: `open` (checked on pixel fire + cron), `reply` (checked via Gmail API thread polling), or manual cancellation.
+
 ## Code Conventions
 
 - No frameworks, no build tools, no npm runtime deps — vanilla JS only
