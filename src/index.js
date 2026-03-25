@@ -1,7 +1,11 @@
 import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, requireAuthCors, servePixel, html } from './shared.js';
-import { sendWebhookNotifications } from './notifications.js';
+import { sendWebhookNotifications, sendSequenceNotification } from './notifications.js';
 import { renderDetail } from './views/detail.js';
 import { renderDashboard } from './views/dashboard.js';
+import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from './templates.js';
+import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
+import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
+import { handleCron, recordOpenForAnalytics } from './cron.js';
 
 export default {
   async fetch(request, env) {
@@ -68,6 +72,12 @@ export default {
         country, ip,
         time: `${timeStr} (${timezone})`
       });
+
+      // Check if this open should stop an active sequence
+      if (env.SEQUENCES) {
+        await checkOpenStopCondition(env, id);
+        await recordOpenForAnalytics(env, id);
+      }
 
       return servePixel();
     }
@@ -189,6 +199,151 @@ export default {
       return html(renderDashboard(results, totalOpens, activeCount));
     }
 
+    // === TEMPLATE ROUTES ===
+
+    if (url.pathname === '/templates' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const templates = await listTemplates(env);
+      return json(templates);
+    }
+
+    if (url.pathname === '/templates' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const body = await request.json();
+      const error = validateTemplate(body);
+      if (error) return json({ error }, 400);
+      const template = await createTemplate(env, body);
+      return json(template, 201);
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/templates/')[1];
+      const template = await getTemplate(env, id);
+      if (!template) return json({ error: 'Template not found' }, 404);
+      return json(template);
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'PUT') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/templates/')[1];
+      const body = await request.json();
+      if (body.steps) {
+        const error = validateTemplate({ name: body.name || 'temp', steps: body.steps, timezone: body.timezone });
+        if (error) return json({ error }, 400);
+      }
+      const updated = await updateTemplate(env, id, body);
+      if (!updated) return json({ error: 'Template not found' }, 404);
+      return json(updated);
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'DELETE') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/templates/')[1];
+      const deleted = await deleteTemplate(env, id);
+      if (!deleted) return json({ error: 'Template not found' }, 404);
+      return json({ deleted: id });
+    }
+
+    // === SEQUENCE ROUTES ===
+
+    if (url.pathname === '/sequences' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const status = url.searchParams.get('status');
+      const sequences = await listSequences(env, status);
+      return json(sequences);
+    }
+
+    if (url.pathname === '/sequences' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const body = await request.json();
+      const error = validateSequence(body);
+      if (error) return json({ error }, 400);
+      const result = await createSequence(env, body);
+      if (result.error) return json({ error: result.error }, 400);
+      return json(result.sequence, 201);
+    }
+
+    if (url.pathname.match(/^\/sequences\/seq:[a-f0-9]+$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/sequences/')[1];
+      const seq = await getSequence(env, id);
+      if (!seq) return json({ error: 'Sequence not found' }, 404);
+      return json(seq);
+    }
+
+    if (url.pathname.match(/^\/sequences\/seq:[a-f0-9]+$/) && request.method === 'DELETE') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/sequences/')[1];
+      const stopped = await stopSequence(env, id, 'manual');
+      if (!stopped) return json({ error: 'Sequence not found' }, 404);
+      return json(stopped);
+    }
+
+    if (url.pathname.match(/^\/sequences\/seq:[a-f0-9]+\/skip$/) && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.match(/^\/sequences\/(seq:[a-f0-9]+)\/skip$/)[1];
+      const result = await skipStep(env, id);
+      if (!result) return json({ error: 'Sequence not found or not active' }, 404);
+      return json(result);
+    }
+
+    // === OAUTH ROUTES ===
+
+    if (url.pathname === '/oauth/url' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const redirectUri = `${url.origin}/oauth/callback`;
+      const authUrl = await getOAuthUrl(env, redirectUri);
+      return json({ url: authUrl });
+    }
+
+    if (url.pathname === '/oauth/callback' && request.method === 'GET') {
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
+      if (!code || !state) return new Response('Missing code or state', { status: 400 });
+      const redirectUri = `${url.origin}/oauth/callback`;
+      const result = await handleOAuthCallback(env, code, state, redirectUri);
+      if (result.success) {
+        return Response.redirect(`${url.origin}/?oauth=success`, 302);
+      }
+      return new Response(`OAuth error: ${result.error}`, { status: 400 });
+    }
+
+    if (url.pathname === '/oauth/status' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const status = await getOAuthStatus(env);
+      return json(status);
+    }
+
+    if (url.pathname === '/oauth/disconnect' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      await disconnectOAuth(env);
+      return json({ disconnected: true });
+    }
+
+    // === ANALYTICS ROUTES ===
+
+    if (url.pathname === '/analytics/templates' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const keys = await env.SEQUENCES.list({ prefix: 'analytics:' });
+      const analytics = await Promise.all(
+        keys.keys.map(k => env.SEQUENCES.get(k.name, 'json'))
+      );
+      return json(analytics.filter(Boolean));
+    }
+
+    if (url.pathname.match(/^\/analytics\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const templateId = url.pathname.split('/analytics/templates/')[1];
+      const analytics = await env.SEQUENCES.get(`analytics:${templateId}`, 'json');
+      if (!analytics) return json({ error: 'No analytics found' }, 404);
+      return json(analytics);
+    }
+
     return new Response('Not found', { status: 404 });
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleCron(env));
   },
 };
