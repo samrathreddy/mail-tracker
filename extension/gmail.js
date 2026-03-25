@@ -316,6 +316,41 @@
 
     console.log(LOG, 'Found untracked recipients:', untracked);
     await injectTracker(bodyEl, untracked);
+
+    // Create sequence if one was selected
+    const seqBtn = form.querySelector('[data-sequence-selector] button');
+    if (seqBtn) {
+      const templateId = seqBtn.getAttribute('data-selected-template');
+      if (templateId) {
+        const { subject, bodyPreview } = getEmailContent(form);
+        const allRecipients = getRecipients(form);
+        for (const recipient of allRecipients) {
+          const img = bodyEl.querySelector('img[data-mail-tracker-to="' + recipient + '"]');
+          const trackerId = img ? new URL(img.src).pathname.split('/t/')[1] : null;
+          if (trackerId) {
+            try {
+              const headers = { 'Content-Type': 'application/json' };
+              if (dashboardPassword) {
+                headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+              }
+              await fetch(serverUrl + '/sequences', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                  templateId: templateId,
+                  trackerId: trackerId,
+                  recipient: recipient,
+                  variables: { subject: subject, originalBody: bodyPreview },
+                  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                }),
+              });
+            } catch (e) {
+              console.error(LOG, 'Failed to create sequence', e);
+            }
+          }
+        }
+      }
+    }
   }
 
   // Watch for Send button clicks — block send, inject pixels, then allow send
@@ -346,7 +381,12 @@
         for (const body of bodies) {
           const form = findComposeForm(body);
           if (!form) continue;
-          
+
+          // Inject sequence selector
+          if (trackingEnabled) {
+            injectSequenceSelector(form);
+          }
+
           const recipients = getRecipients(form);
           const untracked = getUntrackedRecipients(body, recipients);
           
@@ -445,6 +485,118 @@
       emailSpan.parentNode.insertBefore(statusEl, emailSpan.nextSibling);
       console.log(LOG, 'Added indicator for tracked email:', email);
     });
+  }
+
+  // Sequence selector functions
+  async function getTemplates() {
+    if (!serverUrl) return [];
+    try {
+      const headers = {};
+      if (dashboardPassword) {
+        headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+      }
+      const res = await fetch(serverUrl + '/templates', { headers });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch { return []; }
+  }
+
+  function injectSequenceSelector(composeForm) {
+    if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
+
+    const sendButton = composeForm.querySelector('div[role="button"][aria-label*="Send"], div[role="button"][data-tooltip*="Send"]');
+    if (!sendButton) return;
+
+    const container = document.createElement('div');
+    container.setAttribute('data-sequence-selector', 'true');
+    container.style.cssText = 'display:inline-flex;align-items:center;margin-left:8px;position:relative;';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.style.cssText = 'background:#3f3f46;color:#a1a1aa;border:1px solid #52525b;border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;';
+    btn.setAttribute('data-selected-template', '');
+
+    const iconSpan = document.createElement('span');
+    iconSpan.style.fontSize = '14px';
+    iconSpan.textContent = '📋';
+    btn.appendChild(iconSpan);
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'seq-label';
+    labelSpan.textContent = 'No sequence';
+    btn.appendChild(labelSpan);
+
+    const arrowSpan = document.createElement('span');
+    arrowSpan.style.fontSize = '10px';
+    arrowSpan.textContent = '▾';
+    btn.appendChild(arrowSpan);
+
+    const dropdown = document.createElement('div');
+    dropdown.style.cssText = 'display:none;position:absolute;bottom:100%;left:0;background:#27272a;border:1px solid #52525b;border-radius:10px;padding:6px 0;min-width:220px;z-index:9999;margin-bottom:4px;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+
+    btn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dropdown.style.display === 'block') {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      dropdown.textContent = '';
+      const loadingDiv = document.createElement('div');
+      loadingDiv.style.cssText = 'padding:8px 14px;color:#71717a;font-size:12px;';
+      loadingDiv.textContent = 'Loading...';
+      dropdown.appendChild(loadingDiv);
+      dropdown.style.display = 'block';
+
+      const templates = await getTemplates();
+      dropdown.textContent = '';
+
+      const noSeq = document.createElement('div');
+      noSeq.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
+      noSeq.textContent = 'No sequence';
+      noSeq.addEventListener('click', function() {
+        labelSpan.textContent = 'No sequence';
+        btn.setAttribute('data-selected-template', '');
+        dropdown.style.display = 'none';
+      });
+      noSeq.addEventListener('mouseenter', function() { noSeq.style.background = '#3f3f46'; });
+      noSeq.addEventListener('mouseleave', function() { noSeq.style.background = 'none'; });
+      dropdown.appendChild(noSeq);
+
+      if (templates.length > 0) {
+        const divider = document.createElement('div');
+        divider.style.cssText = 'border-top:1px solid #3f3f46;margin:4px 0;';
+        dropdown.appendChild(divider);
+
+        const sectionLabel = document.createElement('div');
+        sectionLabel.style.cssText = 'padding:4px 14px;color:#71717a;font-size:11px;';
+        sectionLabel.textContent = 'TEMPLATES';
+        dropdown.appendChild(sectionLabel);
+
+        templates.forEach(function(tmpl) {
+          const item = document.createElement('div');
+          item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
+          item.textContent = tmpl.name + ' (' + tmpl.steps.length + ' steps)';
+          item.addEventListener('click', function() {
+            labelSpan.textContent = tmpl.name;
+            btn.setAttribute('data-selected-template', tmpl.id);
+            dropdown.style.display = 'none';
+          });
+          item.addEventListener('mouseenter', function() { item.style.background = '#3f3f46'; });
+          item.addEventListener('mouseleave', function() { item.style.background = 'none'; });
+          dropdown.appendChild(item);
+        });
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!container.contains(e.target)) dropdown.style.display = 'none';
+    });
+
+    container.appendChild(btn);
+    container.appendChild(dropdown);
+    sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
   }
 
   // Initialize tracking
