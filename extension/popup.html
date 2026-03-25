@@ -356,9 +356,16 @@
         <button class="btn btn-primary" id="new-btn">+ Manual</button>
       </div>
     </div>
+    <div id="tab-bar" style="display:flex;gap:4px;padding:8px 12px;background:#18181b;border-bottom:1px solid #27272a;">
+      <button class="tab-btn active" data-tab="list" style="background:#27272a;color:#e4e4e7;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Trackers</button>
+      <button class="tab-btn" data-tab="sequences" style="background:transparent;color:#71717a;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Sequences</button>
+      <button class="tab-btn" data-tab="templates" style="background:transparent;color:#71717a;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Templates</button>
+    </div>
     <div id="pixel-container">
       <div class="loading"><div class="spinner"></div>Loading...</div>
     </div>
+    <div id="sequences-view" style="display:none;padding:12px;"></div>
+    <div id="templates-view" style="display:none;padding:12px;"></div>
   </div>
 
   <!-- Detail View -->
@@ -415,6 +422,13 @@
       <p>Enter your Mail Tracker server URL (your Cloudflare Worker URL)</p>
       <input type="url" id="server-input" placeholder="https://mail-tracker.yourname.workers.dev" />
       <input type="password" id="password-input" placeholder="Dashboard password (optional)" />
+      <div id="oauth-status" style="margin-bottom:16px;padding:12px;background:#27272a;border-radius:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#a1a1aa;font-size:13px;">Gmail API</span>
+          <span id="oauth-indicator" style="font-size:13px;color:#71717a;">Checking...</span>
+        </div>
+        <button id="oauth-btn" style="margin-top:8px;background:#6366f1;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;width:100%;display:none;">Connect Gmail</button>
+      </div>
       <button class="btn btn-primary" id="save-btn">Save & Connect</button>
       <p id="setup-error" style="color:#ef4444;margin-top:12px;display:none;"></p>
       <div class="toggle-row">

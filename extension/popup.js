@@ -398,3 +398,209 @@ function truncate(str, len) {
   if (!str) return '?';
   return str.length > len ? str.slice(0, len) + '...' : str;
 }
+
+// === SEQUENCE & TEMPLATE TAB LOGIC ===
+
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(function(b) {
+      b.style.background = 'transparent';
+      b.style.color = '#71717a';
+      b.classList.remove('active');
+    });
+    btn.style.background = '#27272a';
+    btn.style.color = '#e4e4e7';
+    btn.classList.add('active');
+
+    var tab = btn.getAttribute('data-tab');
+    document.getElementById('pixel-container').style.display = tab === 'list' ? '' : 'none';
+    document.getElementById('sequences-view').style.display = tab === 'sequences' ? '' : 'none';
+    document.getElementById('templates-view').style.display = tab === 'templates' ? '' : 'none';
+
+    if (tab === 'sequences') loadSequencesView();
+    if (tab === 'templates') loadTemplatesView();
+  });
+});
+
+async function loadSequencesView() {
+  var container = document.getElementById('sequences-view');
+  container.textContent = '';
+  var loading = document.createElement('div');
+  loading.style.cssText = 'text-align:center;color:#71717a;padding:20px;';
+  loading.textContent = 'Loading...';
+  container.appendChild(loading);
+
+  try {
+    var sequences = await api('/sequences');
+    container.textContent = '';
+
+    if (sequences.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;color:#71717a;padding:20px;';
+      empty.textContent = 'No sequences yet';
+      container.appendChild(empty);
+      return;
+    }
+
+    var statusColors = { active: '#22c55e', stopped: '#eab308', completed: '#6366f1', paused: '#f97316' };
+
+    sequences.forEach(function(seq) {
+      var card = document.createElement('div');
+      card.style.cssText = 'background:#27272a;border-radius:10px;padding:12px;margin-bottom:8px;';
+
+      var header = document.createElement('div');
+      header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+
+      var recipientEl = document.createElement('span');
+      recipientEl.style.cssText = 'color:#e4e4e7;font-size:13px;font-weight:500;';
+      recipientEl.textContent = seq.recipient;
+      header.appendChild(recipientEl);
+
+      var statusEl = document.createElement('span');
+      statusEl.style.cssText = 'font-size:12px;color:' + (statusColors[seq.status] || '#71717a') + ';';
+      statusEl.textContent = seq.status;
+      header.appendChild(statusEl);
+
+      card.appendChild(header);
+
+      var progress = document.createElement('div');
+      progress.style.cssText = 'color:#a1a1aa;font-size:12px;margin-top:4px;';
+      progress.textContent = 'Step ' + seq.currentStep + '/' + seq.steps.length;
+      card.appendChild(progress);
+
+      if (seq.status === 'active') {
+        var actions = document.createElement('div');
+        actions.style.cssText = 'margin-top:8px;display:flex;gap:6px;';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.style.cssText = 'background:#ef4444;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', function() {
+          if (confirm('Cancel this sequence?')) {
+            fetch(serverUrl + '/sequences/' + seq.id, {
+              method: 'DELETE',
+              headers: dashboardPassword ? { 'Authorization': 'Basic ' + btoa(':' + dashboardPassword) } : {},
+            }).then(function() { loadSequencesView(); });
+          }
+        });
+        actions.appendChild(cancelBtn);
+
+        var skipBtn = document.createElement('button');
+        skipBtn.style.cssText = 'background:#3b82f6;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;';
+        skipBtn.textContent = 'Skip';
+        skipBtn.addEventListener('click', function() {
+          if (confirm('Skip current step?')) {
+            fetch(serverUrl + '/sequences/' + seq.id + '/skip', {
+              method: 'POST',
+              headers: dashboardPassword ? { 'Authorization': 'Basic ' + btoa(':' + dashboardPassword) } : {},
+            }).then(function() { loadSequencesView(); });
+          }
+        });
+        actions.appendChild(skipBtn);
+
+        card.appendChild(actions);
+      }
+
+      container.appendChild(card);
+    });
+  } catch (e) {
+    container.textContent = '';
+    var err = document.createElement('div');
+    err.style.cssText = 'text-align:center;color:#ef4444;padding:20px;';
+    err.textContent = 'Failed to load sequences';
+    container.appendChild(err);
+  }
+}
+
+async function loadTemplatesView() {
+  var container = document.getElementById('templates-view');
+  container.textContent = '';
+  var loading = document.createElement('div');
+  loading.style.cssText = 'text-align:center;color:#71717a;padding:20px;';
+  loading.textContent = 'Loading...';
+  container.appendChild(loading);
+
+  try {
+    var templates = await api('/templates');
+    container.textContent = '';
+
+    if (templates.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;color:#71717a;padding:20px;';
+      empty.textContent = 'No templates yet. Create them in the dashboard.';
+      container.appendChild(empty);
+      return;
+    }
+
+    templates.forEach(function(tmpl) {
+      var card = document.createElement('div');
+      card.style.cssText = 'background:#27272a;border-radius:10px;padding:12px;margin-bottom:8px;';
+
+      var name = document.createElement('div');
+      name.style.cssText = 'color:#e4e4e7;font-size:13px;font-weight:500;';
+      name.textContent = tmpl.name;
+      card.appendChild(name);
+
+      var meta = document.createElement('div');
+      meta.style.cssText = 'color:#a1a1aa;font-size:12px;margin-top:4px;';
+      meta.textContent = tmpl.steps.length + ' steps | ' + tmpl.timezone;
+      card.appendChild(meta);
+
+      tmpl.steps.forEach(function(s, i) {
+        var step = document.createElement('div');
+        step.style.cssText = 'color:#71717a;font-size:11px;margin-top:2px;';
+        step.textContent = 'Step ' + (i + 1) + ': Day ' + s.delayDays;
+        card.appendChild(step);
+      });
+
+      container.appendChild(card);
+    });
+  } catch (e) {
+    container.textContent = '';
+    var err = document.createElement('div');
+    err.style.cssText = 'text-align:center;color:#ef4444;padding:20px;';
+    err.textContent = 'Failed to load templates';
+    container.appendChild(err);
+  }
+}
+
+// OAuth status check
+async function checkOAuthStatus() {
+  try {
+    var status = await api('/oauth/status');
+    var indicator = document.getElementById('oauth-indicator');
+    var btn = document.getElementById('oauth-btn');
+    if (!indicator || !btn) return;
+
+    if (status.connected) {
+      indicator.textContent = 'Connected (' + status.email + ')';
+      indicator.style.color = '#22c55e';
+      btn.textContent = 'Disconnect';
+      btn.style.background = '#ef4444';
+      btn.style.display = 'block';
+    } else {
+      indicator.textContent = 'Not connected';
+      indicator.style.color = '#ef4444';
+      btn.textContent = 'Connect Gmail';
+      btn.style.background = '#6366f1';
+      btn.style.display = 'block';
+    }
+  } catch { /* ignore */ }
+}
+
+document.getElementById('oauth-btn')?.addEventListener('click', async function() {
+  try {
+    var status = await api('/oauth/status');
+    if (status.connected) {
+      if (!confirm('Disconnect Gmail?')) return;
+      await fetch(serverUrl + '/oauth/disconnect', {
+        method: 'POST',
+        headers: dashboardPassword ? { 'Authorization': 'Basic ' + btoa(':' + dashboardPassword) } : {},
+      });
+      checkOAuthStatus();
+    } else {
+      var data = await api('/oauth/url');
+      if (data.url) chrome.tabs.create({ url: data.url });
+    }
+  } catch { showToast('OAuth error'); }
+});
