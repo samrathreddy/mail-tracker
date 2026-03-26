@@ -561,9 +561,9 @@ export function renderTemplateEditor(template, oauthConnected) {
         align-items: center;
         gap: 5px;
         height: 28px;
-        border: none;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        color: #fff;
+        border: 1px solid rgba(59,130,246,0.3);
+        background: rgba(59,130,246,0.1);
+        color: #60a5fa;
         border-radius: 4px;
         cursor: pointer;
         font-size: 11px;
@@ -575,8 +575,8 @@ export function renderTemplateEditor(template, oauthConnected) {
         white-space: nowrap;
       }
       .autospintax-btn:hover {
-        background: linear-gradient(135deg, #4f46e5, #7c3aed);
-        box-shadow: 0 0 10px rgba(99,102,241,0.4);
+        background: rgba(59,130,246,0.2);
+        border-color: rgba(59,130,246,0.5);
       }
       .autospintax-btn:focus-visible {
         outline: 2px solid var(--accent);
@@ -1247,10 +1247,36 @@ function buildClientScripts(template) {
       autospintaxBtn.type = 'button';
       autospintaxBtn.className = 'autospintax-btn';
       autospintaxBtn.title = 'Auto-replace common phrases with spintax alternatives';
-      var wandSpan = document.createElement('span');
-      wandSpan.textContent = '\\u2728';
-      wandSpan.style.fontSize = '13px';
-      autospintaxBtn.appendChild(wandSpan);
+      var wandSvgNS = 'http://www.w3.org/2000/svg';
+      var wandSvg = document.createElementNS(wandSvgNS, 'svg');
+      wandSvg.setAttribute('width', '14');
+      wandSvg.setAttribute('height', '14');
+      wandSvg.setAttribute('viewBox', '0 0 24 24');
+      wandSvg.setAttribute('fill', 'none');
+      wandSvg.setAttribute('stroke', 'currentColor');
+      wandSvg.setAttribute('stroke-width', '2');
+      wandSvg.setAttribute('stroke-linecap', 'round');
+      wandSvg.setAttribute('stroke-linejoin', 'round');
+      // Lucide "wand-sparkles" icon paths
+      var wandPath1 = document.createElementNS(wandSvgNS, 'path');
+      wandPath1.setAttribute('d', 'M21.64 3.64l-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.21 1.21 0 0 0 1.72 0L21.64 5.36a1.21 1.21 0 0 0 0-1.72z');
+      wandSvg.appendChild(wandPath1);
+      var wandPath2 = document.createElementNS(wandSvgNS, 'path');
+      wandPath2.setAttribute('d', 'M14 7l3 3');
+      wandSvg.appendChild(wandPath2);
+      var wandStar1 = document.createElementNS(wandSvgNS, 'path');
+      wandStar1.setAttribute('d', 'M5 6v4');
+      wandSvg.appendChild(wandStar1);
+      var wandStar2 = document.createElementNS(wandSvgNS, 'path');
+      wandStar2.setAttribute('d', 'M3 8h4');
+      wandSvg.appendChild(wandStar2);
+      var wandStar3 = document.createElementNS(wandSvgNS, 'path');
+      wandStar3.setAttribute('d', 'M19 14v4');
+      wandSvg.appendChild(wandStar3);
+      var wandStar4 = document.createElementNS(wandSvgNS, 'path');
+      wandStar4.setAttribute('d', 'M17 16h4');
+      wandSvg.appendChild(wandStar4);
+      autospintaxBtn.appendChild(wandSvg);
       var spintaxLabel = document.createElement('span');
       spintaxLabel.textContent = 'Autospintax';
       autospintaxBtn.appendChild(spintaxLabel);
