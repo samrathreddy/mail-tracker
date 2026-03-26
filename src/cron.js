@@ -126,7 +126,8 @@ async function sendDueFollowUps(env) {
       variables: seq.variables || {},
     };
 
-    const renderedSubject = substituteVariables(step.subject, context);
+    const stepSubject = (step.subject && step.subject.trim()) ? step.subject : 'Re: {{subject}}';
+    const renderedSubject = substituteVariables(stepSubject, context);
     const renderedBody = substituteVariables(step.body, context);
 
     // Send via Gmail API
@@ -400,6 +401,30 @@ async function updateAnalytics(env, templateId, stepIndex, eventType, sequenceEv
       stepStats.openRate = parseFloat((stepStats.opened / stepStats.sent).toFixed(2));
       stepStats.replyRate = parseFloat((stepStats.replied / stepStats.sent).toFixed(2));
     }
+  }
+
+  // Write daily bucketed data for time-series charts
+  if (eventType && templateId) {
+    const today = new Date().toISOString().split('T')[0];
+    const dailyKey = `analytics-daily:${templateId}`;
+    let dailyData = await env.SEQUENCES.get(dailyKey, 'json');
+    if (!dailyData) {
+      dailyData = { templateId, days: {} };
+    }
+    if (!dailyData.days[today]) {
+      dailyData.days[today] = { sent: 0, opened: 0, replied: 0 };
+    }
+    if (eventType === 'sent') dailyData.days[today].sent++;
+    else if (eventType === 'opened') dailyData.days[today].opened++;
+    else if (eventType === 'replied') dailyData.days[today].replied++;
+
+    // Prune entries older than 90 days
+    const cutoff = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0];
+    for (const day of Object.keys(dailyData.days)) {
+      if (day < cutoff) delete dailyData.days[day];
+    }
+
+    await env.SEQUENCES.put(dailyKey, JSON.stringify(dailyData));
   }
 
   analytics.updatedAt = new Date().toISOString();
