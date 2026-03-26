@@ -2,9 +2,9 @@
   "manifest_version": 3,
   "name": "Mail Tracker",
   "description": "Track email opens in Gmail. Auto-injects invisible tracking pixel per recipient on Send.",
-  "version": "1.1.0",
-  "permissions": ["storage", "notifications", "alarms"],
-  "host_permissions": ["*://*/"],
+  "version": "1.2.0",
+  "permissions": ["storage", "notifications", "alarms", "activeTab", "tabs"],
+  "host_permissions": ["https://mail.google.com/*", "https://*.workers.dev/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

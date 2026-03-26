@@ -85,3 +85,28 @@ chrome.runtime.onInstalled.addListener(() => {
   pollForOpens();
   pollSequenceStatus();
 });
+
+// Gray out icon on non-Gmail tabs, full color on Gmail
+function updateIconForTab(tabId, url) {
+  const isGmail = url && url.startsWith('https://mail.google.com');
+  if (isGmail) {
+    chrome.action.setIcon({ tabId, path: { '16': 'icons/icon16.png', '48': 'icons/icon48.png', '128': 'icons/icon128.png' } });
+    chrome.action.setPopup({ tabId, popup: 'popup.html' });
+  } else {
+    // Disable popup on non-Gmail — clicking shows nothing useful
+    chrome.action.setPopup({ tabId, popup: '' });
+  }
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url || changeInfo.status === 'complete') {
+    updateIconForTab(tabId, tab.url);
+  }
+});
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    updateIconForTab(activeInfo.tabId, tab.url);
+  } catch { /* tab may not exist */ }
+});
