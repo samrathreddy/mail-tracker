@@ -342,13 +342,19 @@ export function renderDashboard(opts) {
       if (to) body.to = to;
       if (subject) body.subject = subject;
       fetch('/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+          if (!r.ok) throw new Error('Request failed');
+          return r.json();
+        })
         .then(function(data) {
           createdPixelHtml = data.html;
           document.getElementById('resultHtml').textContent = data.html;
           document.getElementById('resultStats').textContent = data.stats;
           modalForm.style.display = 'none';
           modalResult.style.display = '';
+        })
+        .catch(function(err) {
+          alert('Error: ' + err.message);
         });
     });
 

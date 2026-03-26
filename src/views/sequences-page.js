@@ -285,8 +285,14 @@ export function renderSequencesPage(sequences, oauthConnected) {
         e.stopPropagation();
         var seqId = btn.getAttribute('data-cancel');
         if (confirm('Cancel this sequence?')) {
-          fetch('/sequences/' + encodeURIComponent(seqId), { method: 'DELETE' })
-            .then(function() { location.reload(); });
+          fetch('/sequences/' + seqId, { method: 'DELETE' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Request failed');
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('Error: ' + err.message);
+            });
         }
       });
     });
@@ -297,8 +303,14 @@ export function renderSequencesPage(sequences, oauthConnected) {
         e.stopPropagation();
         var seqId = btn.getAttribute('data-skip');
         if (confirm('Skip the current step?')) {
-          fetch('/sequences/' + encodeURIComponent(seqId) + '/skip', { method: 'POST' })
-            .then(function() { location.reload(); });
+          fetch('/sequences/' + seqId + '/skip', { method: 'POST' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Request failed');
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('Error: ' + err.message);
+            });
         }
       });
     });

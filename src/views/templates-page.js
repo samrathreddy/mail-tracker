@@ -250,7 +250,10 @@ export function renderTemplatesPage(templates, oauthConnected) {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         })
-        .then(function(res) { return res.json(); })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Request failed');
+          return res.json();
+        })
         .then(function(tmpl) {
           var payload = {
             name: (tmpl.name || 'Template') + ' (copy)',
@@ -263,7 +266,10 @@ export function renderTemplatesPage(templates, oauthConnected) {
             body: JSON.stringify(payload)
           });
         })
-        .then(function(res) { return res.json(); })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Request failed');
+          return res.json();
+        })
         .then(function(created) {
           if (created && created.id) {
             window.location.href = '/templates/' + created.id + '/edit';

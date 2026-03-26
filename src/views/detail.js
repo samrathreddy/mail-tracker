@@ -262,7 +262,14 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
     // Delete button
     document.getElementById('deleteBtn').addEventListener('click', function() {
       if (confirm('Delete this tracker?')) {
-        fetch('/d/' + DATA.id).then(function() { location.href = '/'; });
+        fetch('/d/' + DATA.id)
+          .then(function(res) {
+            if (!res.ok) throw new Error('Request failed');
+            location.href = '/';
+          })
+          .catch(function(err) {
+            alert('Error: ' + err.message);
+          });
       }
     });
 
@@ -271,7 +278,14 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
     if (cancelSeqBtn) {
       cancelSeqBtn.addEventListener('click', function() {
         if (confirm('Cancel sequence?')) {
-          fetch('/sequences/' + DATA.sequenceId, { method: 'DELETE' }).then(function() { location.reload(); });
+          fetch('/sequences/' + DATA.sequenceId, { method: 'DELETE' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Request failed');
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('Error: ' + err.message);
+            });
         }
       });
     }
@@ -279,7 +293,14 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
     if (skipStepBtn) {
       skipStepBtn.addEventListener('click', function() {
         if (confirm('Skip current step?')) {
-          fetch('/sequences/' + DATA.sequenceId + '/skip', { method: 'POST' }).then(function() { location.reload(); });
+          fetch('/sequences/' + DATA.sequenceId + '/skip', { method: 'POST' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Request failed');
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('Error: ' + err.message);
+            });
         }
       });
     }

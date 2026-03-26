@@ -153,7 +153,10 @@ export function renderSettingsPage(opts) {
           connectBtn.disabled = true;
           connectBtn.textContent = 'Connecting...';
           fetch('/oauth/url')
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+              if (!r.ok) throw new Error('Request failed');
+              return r.json();
+            })
             .then(function(data) {
               if (data.url) {
                 window.location.href = data.url;
@@ -177,7 +180,10 @@ export function renderSettingsPage(opts) {
           disconnectBtn.disabled = true;
           disconnectBtn.textContent = 'Disconnecting...';
           fetch('/oauth/disconnect', { method: 'POST' })
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+              if (!r.ok) throw new Error('Request failed');
+              return r.json();
+            })
             .then(function(data) {
               if (data.disconnected) {
                 window.location.reload();
