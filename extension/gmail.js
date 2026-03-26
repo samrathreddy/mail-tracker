@@ -542,9 +542,6 @@
     const sendButton = composeForm.querySelector('div[role="button"][aria-label*="Send"], div[role="button"][data-tooltip*="Send"]');
     if (!sendButton) return;
 
-    // Find the Send button's row/container to place our button nearby but separated
-    const sendRow = sendButton.closest('tr') || sendButton.parentElement;
-
     const container = document.createElement('div');
     container.setAttribute('data-sequence-selector', 'true');
     container.style.cssText = 'display:inline-flex;align-items:center;position:relative;margin-left:4px;';
@@ -694,7 +691,12 @@
     container.appendChild(dropdown);
 
     // Insert at the end of the send row, with visual separation from Send button
-    sendRow.appendChild(container);
+    // Insert right after the Send button, not at the end of the row
+    if (sendButton.nextSibling) {
+      sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
+    } else {
+      sendButton.parentElement.appendChild(container);
+    }
   }
 
   function _insertTextAtCursor(textarea, text) {

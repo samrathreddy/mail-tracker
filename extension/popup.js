@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event listeners
   document.getElementById('new-btn').addEventListener('click', createPixel);
   document.getElementById('settings-btn').addEventListener('click', () => showSetup(false));
+  document.getElementById('dashboard-btn').addEventListener('click', () => {
+    if (serverUrl) chrome.tabs.create({ url: serverUrl });
+  });
   document.getElementById('back-btn').addEventListener('click', showList);
   document.getElementById('setup-back-btn').addEventListener('click', () => {
     if (serverUrl) {
