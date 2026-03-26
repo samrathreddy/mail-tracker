@@ -318,7 +318,9 @@
     await injectTracker(bodyEl, untracked);
 
     // Create sequence if one was selected
-    const seqBtn = form.querySelector('[data-sequence-selector] button');
+    // Search within form first, then the whole compose dialog (button may be in toolbar)
+    const seqBtn = form.querySelector('[data-sequence-selector] button') ||
+                   (form.closest('[role="dialog"]') || document).querySelector('[data-sequence-selector] button');
     if (seqBtn) {
       const templateId = seqBtn.getAttribute('data-selected-template');
       const oneoffSteps = seqBtn.getAttribute('data-oneoff-steps');
@@ -357,11 +359,17 @@
                   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 });
               }
-              await fetch(serverUrl + '/sequences', {
+              var seqRes = await fetch(serverUrl + '/sequences', {
                 method: 'POST',
                 headers: headers,
                 body: seqBody,
               });
+              if (!seqRes.ok) {
+                var errText = await seqRes.text().catch(function() { return 'unknown error'; });
+                console.error(LOG, 'Sequence creation failed:', seqRes.status, errText);
+              } else {
+                console.log(LOG, 'Sequence created for', recipient);
+              }
             } catch (e) {
               console.error(LOG, 'Failed to create sequence', e);
             }
@@ -531,14 +539,11 @@
   function injectSequenceSelector(composeForm) {
     if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
 
-    // Find the formatting toolbar row (contains Aa, attachment, emoji icons)
-    const toolbar = composeForm.querySelector('tr.btC td.gU') ||
-                    composeForm.querySelector('div[aria-label*="ormatting"]')?.parentElement ||
-                    composeForm.querySelector('.bAK');
-
-    // Fallback: find the Send button's parent row
     const sendButton = composeForm.querySelector('div[role="button"][aria-label*="Send"], div[role="button"][data-tooltip*="Send"]');
-    if (!sendButton && !toolbar) return;
+    if (!sendButton) return;
+
+    // Find the Send button's row/container to place our button nearby but separated
+    const sendRow = sendButton.closest('tr') || sendButton.parentElement;
 
     const container = document.createElement('div');
     container.setAttribute('data-sequence-selector', 'true');
@@ -688,16 +693,8 @@
     container.appendChild(btn);
     container.appendChild(dropdown);
 
-    // Try to insert in the formatting toolbar row (away from Send button)
-    if (toolbar) {
-      toolbar.appendChild(container);
-    } else if (sendButton) {
-      // Fallback: insert after send button with a separator
-      container.style.marginLeft = '12px';
-      container.style.borderLeft = '1px solid #dadce0';
-      container.style.paddingLeft = '12px';
-      sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
-    }
+    // Insert at the end of the send row, with visual separation from Send button
+    sendRow.appendChild(container);
   }
 
   function _insertTextAtCursor(textarea, text) {
