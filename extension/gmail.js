@@ -537,6 +537,305 @@
     btn.title = tooltipText;
   }
 
+  // Spam checker word lists
+  var SPAM_RED = ['free', 'buy now', 'act now', 'limited time', 'click here',
+    'no obligation', 'risk-free', 'winner', 'congratulations', 'urgent', '100%',
+    'guarantee', 'earn money', 'make money', 'cash', 'credit', 'discount', 'deal',
+    'lowest price', 'order now', 'subscribe', 'no cost'];
+  var SPAM_ORANGE = ['opportunity', 'amazing', 'incredible', 'exclusive',
+    'special', 'bonus', 'profit', 'income', 'investment', 'affordable'];
+  var SPAM_YELLOW = ['reminder', 'help', 'improve', 'solution', 'results',
+    'success', 'easy', 'simple', 'proven', 'effective'];
+
+  function findSpamWords(text, wordList) {
+    var found = [];
+    for (var i = 0; i < wordList.length; i++) {
+      var word = wordList[i];
+      var escaped = word.replace(/[.*+?^\\|(){}[\]]/g, function(c) { return '\\' + c; });
+      var regex = new RegExp('\\b' + escaped + '\\b', 'gi');
+      if (regex.test(text)) {
+        found.push(word);
+      }
+    }
+    return found;
+  }
+
+  function analyzeComposeSpam(composeForm) {
+    var subjectEl = composeForm.querySelector('input[name="subjectbox"]') ||
+      composeForm.querySelector('input[aria-label*="Subject"]');
+    var subject = subjectEl ? subjectEl.value : '';
+
+    var bodyEl = composeForm.querySelector('[contenteditable="true"][aria-label*="Message"]') ||
+      composeForm.querySelector('[contenteditable="true"][role="textbox"]') ||
+      composeForm.querySelector('[contenteditable="true"]');
+    var bodyHtml = bodyEl ? bodyEl.innerHTML : '';
+
+    var text = bodyHtml.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    var fullText = (subject + ' ' + text).toLowerCase();
+
+    var plainText = fullText.replace(/\{\{([^}]*)\}\}/g, function(m, inner) {
+      return inner.indexOf('|') !== -1 ? inner.split('|')[0] : inner;
+    });
+    var wordCount = plainText.split(/\s+/).filter(Boolean).length;
+
+    var spintaxMatches = fullText.match(/\{\{[^}]+\}\}/g) || [];
+    var spintaxPercent = wordCount > 0 ? Math.round((spintaxMatches.length / wordCount) * 100) : 0;
+
+    var redFound = findSpamWords(fullText, SPAM_RED);
+    var orangeFound = findSpamWords(fullText, SPAM_ORANGE);
+    var yellowFound = findSpamWords(fullText, SPAM_YELLOW);
+
+    var linkCount = (bodyHtml.match(/<a\b/gi) || []).length;
+    var urlsInText = text.match(/https?:\/\/\S+/gi) || [];
+    linkCount += urlsInText.length;
+    var imageCount = (bodyHtml.match(/<img\b/gi) || []).length;
+    var emojiCount;
+    try {
+      var emojiMatches = text.match(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu);
+      emojiCount = emojiMatches ? emojiMatches.length : 0;
+    } catch(_e) { emojiCount = 0; }
+
+    var score = 0;
+    score += redFound.length * 10;
+    score += orangeFound.length * 5;
+    score += yellowFound.length * 2;
+    score += Math.max(0, linkCount * 15);
+    score += Math.max(0, imageCount * 10);
+    score += Math.max(0, (emojiCount - 1) * 5);
+    if (wordCount < 25 || wordCount > 100) score += 10;
+    if (spintaxPercent < 5) score += 10;
+    score = Math.min(100, score);
+
+    return {
+      score: score,
+      red: redFound,
+      orange: orangeFound,
+      yellow: yellowFound,
+      spintaxPercent: spintaxPercent,
+      linkCount: linkCount,
+      imageCount: imageCount,
+      emojiCount: emojiCount,
+      wordCount: wordCount
+    };
+  }
+
+  function spamScoreColor(score) {
+    if (score < 30) return '#22c55e';
+    if (score <= 60) return '#eab308';
+    return '#ef4444';
+  }
+
+  function spamSeverityColor(level) {
+    if (level === 'green') return '#22c55e';
+    if (level === 'yellow') return '#eab308';
+    return '#ef4444';
+  }
+
+  function buildSpamPanel(composeForm) {
+    var data = analyzeComposeSpam(composeForm);
+    var panel = document.createElement('div');
+    panel.className = 'gmail-spam-panel';
+    panel.style.cssText = 'position:fixed;z-index:10000;width:280px;background:#ffffff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:16px;font-family:Google Sans,Roboto,sans-serif;';
+
+    // Close button
+    var closeBtn = document.createElement('div');
+    closeBtn.style.cssText = 'position:absolute;top:8px;right:10px;cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#6b7280;font-size:16px;line-height:1;';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('mouseenter', function() { closeBtn.style.background = '#f3f4f6'; });
+    closeBtn.addEventListener('mouseleave', function() { closeBtn.style.background = 'none'; });
+    closeBtn.addEventListener('click', function() { panel.remove(); });
+    panel.appendChild(closeBtn);
+
+    // Title
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:13px;font-weight:600;color:#1f2937;margin-bottom:12px;';
+    title.textContent = 'Spam Analysis';
+    panel.appendChild(title);
+
+    // Score ring
+    var ringWrap = document.createElement('div');
+    ringWrap.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:14px;';
+    var ringSize = 64;
+    var radius = 26;
+    var circumference = 2 * Math.PI * radius;
+    var dashLen = (data.score / 100) * circumference;
+    var ringColor = spamScoreColor(data.score);
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', String(ringSize));
+    svg.setAttribute('height', String(ringSize));
+    svg.setAttribute('viewBox', '0 0 ' + ringSize + ' ' + ringSize);
+
+    var bgCircle = document.createElementNS(svgNS, 'circle');
+    bgCircle.setAttribute('cx', String(ringSize / 2));
+    bgCircle.setAttribute('cy', String(ringSize / 2));
+    bgCircle.setAttribute('r', String(radius));
+    bgCircle.setAttribute('fill', 'none');
+    bgCircle.setAttribute('stroke', '#e5e7eb');
+    bgCircle.setAttribute('stroke-width', '4');
+    svg.appendChild(bgCircle);
+
+    var fgCircle = document.createElementNS(svgNS, 'circle');
+    fgCircle.setAttribute('cx', String(ringSize / 2));
+    fgCircle.setAttribute('cy', String(ringSize / 2));
+    fgCircle.setAttribute('r', String(radius));
+    fgCircle.setAttribute('fill', 'none');
+    fgCircle.setAttribute('stroke', ringColor);
+    fgCircle.setAttribute('stroke-width', '4');
+    fgCircle.setAttribute('stroke-dasharray', dashLen + ' ' + (circumference - dashLen));
+    fgCircle.setAttribute('stroke-dashoffset', String(circumference * 0.25));
+    fgCircle.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(fgCircle);
+
+    var scoreText = document.createElementNS(svgNS, 'text');
+    scoreText.setAttribute('x', String(ringSize / 2));
+    scoreText.setAttribute('y', String(ringSize / 2 + 1));
+    scoreText.setAttribute('text-anchor', 'middle');
+    scoreText.setAttribute('dominant-baseline', 'middle');
+    scoreText.setAttribute('fill', ringColor);
+    scoreText.setAttribute('font-size', '15');
+    scoreText.setAttribute('font-weight', '700');
+    scoreText.setAttribute('font-family', 'inherit');
+    scoreText.textContent = data.score + '%';
+    svg.appendChild(scoreText);
+
+    ringWrap.appendChild(svg);
+
+    var ringLabel = document.createElement('div');
+    ringLabel.style.cssText = 'font-size:12px;color:#6b7280;';
+    ringLabel.textContent = data.score < 30 ? 'Low spam risk' : data.score <= 60 ? 'Moderate spam risk' : 'High spam risk';
+    ringWrap.appendChild(ringLabel);
+    panel.appendChild(ringWrap);
+
+    // Metric row helper
+    function addMetric(label, value, barPercent, severity, inverted) {
+      var row = document.createElement('div');
+      row.style.cssText = 'margin-bottom:10px;';
+      var header = document.createElement('div');
+      header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;';
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:11px;color:#6b7280;';
+      lbl.textContent = label;
+      header.appendChild(lbl);
+      var val = document.createElement('span');
+      val.style.cssText = 'font-size:11px;font-weight:600;color:' + spamSeverityColor(severity) + ';';
+      val.textContent = String(value);
+      header.appendChild(val);
+      row.appendChild(header);
+
+      var bar = document.createElement('div');
+      bar.style.cssText = 'height:4px;border-radius:2px;background:linear-gradient(90deg,#22c55e 0%,#22c55e 33%,#eab308 33%,#eab308 66%,#ef4444 66%,#ef4444 100%);position:relative;';
+      if (inverted) {
+        bar.style.background = 'linear-gradient(90deg, #ef4444 0%, #ef4444 33%, #eab308 33%, #eab308 66%, #22c55e 66%, #22c55e 100%)';
+      }
+      var marker = document.createElement('div');
+      marker.style.cssText = 'position:absolute;top:-2px;width:8px;height:8px;border-radius:50%;background:#1f2937;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);transform:translateX(-50%);left:' + Math.min(100, Math.max(0, barPercent)) + '%;';
+      bar.appendChild(marker);
+      row.appendChild(bar);
+      return row;
+    }
+
+    // Spam Words
+    var totalSpamWords = data.red.length + data.orange.length + data.yellow.length;
+    var spamWordSeverity = data.red.length > 0 ? 'red' : data.orange.length > 0 ? 'yellow' : 'green';
+    var spamBarPct = Math.min(100, totalSpamWords * 10);
+    var spamMetric = addMetric('Spam Words', totalSpamWords, spamBarPct, spamWordSeverity);
+
+    if (totalSpamWords > 0) {
+      var tags = document.createElement('div');
+      tags.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;';
+      function addTags(words, bgColor) {
+        for (var i = 0; i < words.length; i++) {
+          var tag = document.createElement('span');
+          tag.style.cssText = 'font-size:10px;padding:1px 6px;border-radius:8px;color:#fff;background:' + bgColor + ';';
+          tag.textContent = words[i];
+          tags.appendChild(tag);
+        }
+      }
+      addTags(data.red, '#ef4444');
+      addTags(data.orange, '#f97316');
+      addTags(data.yellow, '#eab308');
+      spamMetric.appendChild(tags);
+    }
+    panel.appendChild(spamMetric);
+
+    // Spintax & Variables (inverted bar: higher is better)
+    var spintaxSeverity = data.spintaxPercent >= 10 ? 'green' : data.spintaxPercent >= 5 ? 'yellow' : 'red';
+    var spintaxBarPct = Math.min(100, data.spintaxPercent * 2.5);
+    panel.appendChild(addMetric('Spintax & Variables', data.spintaxPercent + '%', spintaxBarPct, spintaxSeverity, true));
+
+    // Links
+    var linkSeverity = data.linkCount === 0 ? 'green' : data.linkCount <= 2 ? 'yellow' : 'red';
+    panel.appendChild(addMetric('Links', data.linkCount, Math.min(100, data.linkCount * 25), linkSeverity));
+
+    // Images
+    var imgSeverity = data.imageCount === 0 ? 'green' : data.imageCount === 1 ? 'yellow' : 'red';
+    panel.appendChild(addMetric('Images', data.imageCount, Math.min(100, data.imageCount * 35), imgSeverity));
+
+    // Emojis
+    var emojiSeverity = data.emojiCount <= 1 ? 'green' : data.emojiCount <= 3 ? 'yellow' : 'red';
+    panel.appendChild(addMetric('Emojis', data.emojiCount, Math.min(100, data.emojiCount * 15), emojiSeverity));
+
+    // Word Count (custom bar: red-yellow-green-yellow-red)
+    var wcSeverity = (data.wordCount >= 25 && data.wordCount <= 100) ? 'green'
+      : ((data.wordCount >= 15 && data.wordCount < 25) || (data.wordCount > 100 && data.wordCount <= 150)) ? 'yellow' : 'red';
+    var wcBarPct = Math.min(100, (data.wordCount / 150) * 100);
+    var wcMetric = addMetric('Word Count', '~' + data.wordCount, wcBarPct, wcSeverity);
+    var wcBar = wcMetric.querySelector('div[style*="border-radius:2px"]');
+    if (wcBar) {
+      wcBar.style.background = 'linear-gradient(90deg, #ef4444 0%, #eab308 10%, #eab308 17%, #22c55e 17%, #22c55e 67%, #eab308 67%, #eab308 80%, #ef4444 80%, #ef4444 100%)';
+    }
+    panel.appendChild(wcMetric);
+
+    // Recommendations
+    var recs = [];
+    if (data.red.length > 0) recs.push('Remove high-severity spam trigger words.');
+    if (data.linkCount > 0) recs.push('Avoid hyperlinks \u2014 use plain text URLs instead.');
+    if (data.imageCount > 0) recs.push('Minimize images to improve deliverability.');
+    if (data.spintaxPercent < 5) recs.push('Add more spintax or variables for personalization.');
+    if (data.wordCount < 25) recs.push('Email body is very short \u2014 add more context.');
+    if (data.wordCount > 100) recs.push('Consider shortening your email for better engagement.');
+    if (data.emojiCount > 3) recs.push('Reduce emoji usage to avoid spam filters.');
+
+    if (recs.length > 0) {
+      var recBox = document.createElement('div');
+      recBox.style.cssText = 'margin-top:10px;padding:8px 10px;background:#fef9c3;border:1px solid #fde68a;border-radius:8px;font-size:10px;color:#92400e;line-height:1.4;';
+      recBox.textContent = recs.join(' ');
+      panel.appendChild(recBox);
+    }
+
+    return panel;
+  }
+
+  function toggleSpamPanel(composeForm, anchorEl) {
+    var existing = document.querySelector('.gmail-spam-panel');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    var panel = buildSpamPanel(composeForm);
+
+    // Position above the anchor button
+    var rect = anchorEl.getBoundingClientRect();
+    panel.style.left = Math.max(8, rect.left) + 'px';
+    panel.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+
+    document.body.appendChild(panel);
+
+    // Close on outside click (one-time listener)
+    function closeOnOutside(e) {
+      if (!panel.contains(e.target) && !anchorEl.contains(e.target)) {
+        panel.remove();
+        document.removeEventListener('click', closeOnOutside, true);
+      }
+    }
+    setTimeout(function() {
+      document.addEventListener('click', closeOnOutside, true);
+    }, 0);
+  }
+
   function injectSequenceSelector(composeForm) {
     if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
 
@@ -722,6 +1021,57 @@
           sendTd.parentElement.appendChild(container);
         }
       }
+    }
+
+    // Inject Spam Check button next to the sequence selector
+    var spamContainer = document.createElement('div');
+    spamContainer.setAttribute('data-spam-checker', 'true');
+    spamContainer.style.cssText = 'display:inline-flex;align-items:center;position:relative;';
+
+    var spamBtn = document.createElement('div');
+    spamBtn.style.cssText = 'width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:5px;border-radius:50%;transition:background 0.15s;';
+    spamBtn.setAttribute('role', 'button');
+    spamBtn.setAttribute('tabindex', '1');
+    spamBtn.title = 'Check email for spam';
+
+    // Shield icon SVG (blue)
+    var spamSvgNS = 'http://www.w3.org/2000/svg';
+    var spamSvg = document.createElementNS(spamSvgNS, 'svg');
+    spamSvg.setAttribute('width', '18');
+    spamSvg.setAttribute('height', '18');
+    spamSvg.setAttribute('viewBox', '0 0 24 24');
+    spamSvg.setAttribute('fill', 'none');
+    spamSvg.setAttribute('stroke', '#3b82f6');
+    spamSvg.setAttribute('stroke-width', '2');
+    spamSvg.setAttribute('stroke-linecap', 'round');
+    spamSvg.setAttribute('stroke-linejoin', 'round');
+
+    var shieldPath = document.createElementNS(spamSvgNS, 'path');
+    shieldPath.setAttribute('d', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z');
+    spamSvg.appendChild(shieldPath);
+
+    // Checkmark inside the shield
+    var checkPath = document.createElementNS(spamSvgNS, 'path');
+    checkPath.setAttribute('d', 'M9 12l2 2 4-4');
+    spamSvg.appendChild(checkPath);
+
+    spamBtn.appendChild(spamSvg);
+
+    spamBtn.addEventListener('mouseenter', function() { spamBtn.style.background = 'rgba(0,0,0,0.06)'; });
+    spamBtn.addEventListener('mouseleave', function() { spamBtn.style.background = 'transparent'; });
+
+    spamBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSpamPanel(composeForm, spamContainer);
+    });
+
+    spamContainer.appendChild(spamBtn);
+
+    // Append to the same toolbar target as the sequence selector
+    var spamTarget = container.parentElement;
+    if (spamTarget) {
+      spamTarget.appendChild(spamContainer);
     }
   }
 
