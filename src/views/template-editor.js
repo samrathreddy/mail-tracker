@@ -554,6 +554,208 @@ export function renderTemplateEditor(template, oauthConnected) {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
       }
+
+      /* Autospintax button */
+      .autospintax-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 28px;
+        border: none;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #fff;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        font-family: inherit;
+        padding: 0 10px;
+        margin-left: 4px;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+      }
+      .autospintax-btn:hover {
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        box-shadow: 0 0 10px rgba(99,102,241,0.4);
+      }
+      .autospintax-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .autospintax-toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: #18181b;
+        color: #e4e4e7;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 1px solid #3f3f46;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        z-index: 9999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+      .autospintax-toast.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* Spam checker panel */
+      .spam-toggle-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 28px;
+        border: none;
+        background: none;
+        color: var(--text-secondary);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        font-family: inherit;
+        padding: 0 8px;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+      }
+      .spam-toggle-btn:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+      .spam-toggle-btn.active {
+        background: var(--accent-bg);
+        color: var(--accent-light);
+      }
+
+      .editor-with-spam {
+        display: flex;
+        gap: 0;
+        flex: 1;
+        min-height: 0;
+      }
+      .editor-main {
+        flex: 1;
+        min-width: 0;
+      }
+      .spam-panel {
+        width: 0;
+        overflow: hidden;
+        opacity: 0;
+        background: var(--bg-sidebar);
+        border-left: 1px solid var(--border);
+        transition: width 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 0;
+      }
+      .spam-panel.open {
+        width: 280px;
+        min-width: 280px;
+        opacity: 1;
+        padding: 16px;
+        overflow-y: auto;
+      }
+      .spam-panel-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+      }
+      .spam-score-ring {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .spam-score-ring svg {
+        filter: drop-shadow(0 0 6px rgba(0,0,0,0.3));
+      }
+      .spam-score-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+      .spam-metric {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .spam-metric-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .spam-metric-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+      .spam-metric-value {
+        font-size: 12px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .spam-bar {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #22c55e 0%, #22c55e 33%, #eab308 33%, #eab308 66%, #ef4444 66%, #ef4444 100%);
+        position: relative;
+      }
+      .spam-bar-marker {
+        position: absolute;
+        top: -3px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #18181b;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        transform: translateX(-50%);
+        transition: left 0.3s ease;
+      }
+      .spam-word-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 2px;
+      }
+      .spam-word-tag {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .spam-word-tag.red {
+        background: rgba(239,68,68,0.15);
+        color: #f87171;
+      }
+      .spam-word-tag.orange {
+        background: rgba(249,115,22,0.15);
+        color: #fb923c;
+      }
+      .spam-word-tag.yellow {
+        background: rgba(234,179,8,0.15);
+        color: #facc15;
+      }
+      .spam-recommendation {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.5;
+        padding: 8px;
+        background: var(--bg-hover);
+        border-radius: var(--radius-btn);
+      }
+      .severity-green { color: #22c55e; }
+      .severity-yellow { color: #eab308; }
+      .severity-red { color: #ef4444; }
     </style>`;
 
   // The save button uses an onclick attribute calling saveTemplate(), which is
@@ -965,7 +1167,7 @@ function buildClientScripts(template) {
       subjectInput.placeholder = 'Re: {{subject}}';
       subjectInput.value = step.subject;
       subjectInput.addEventListener('focus', function() { lastFocusedField = 'subject'; });
-      subjectInput.addEventListener('input', function() { debouncePreviewUpdate(); });
+      subjectInput.addEventListener('input', function() { debouncePreviewUpdate(); debounceSpamUpdate(); });
       subjectRow.appendChild(subjectInput);
 
       var subjectVarBtn = document.createElement('button');
@@ -1040,9 +1242,38 @@ function buildClientScripts(template) {
       });
       toolbar.appendChild(toolbarVarBtn);
 
+      // Autospintax button
+      var autospintaxBtn = document.createElement('button');
+      autospintaxBtn.type = 'button';
+      autospintaxBtn.className = 'autospintax-btn';
+      autospintaxBtn.title = 'Auto-replace common phrases with spintax alternatives';
+      var wandSpan = document.createElement('span');
+      wandSpan.textContent = '\\u2728';
+      wandSpan.style.fontSize = '13px';
+      autospintaxBtn.appendChild(wandSpan);
+      var spintaxLabel = document.createElement('span');
+      spintaxLabel.textContent = 'Autospintax';
+      autospintaxBtn.appendChild(spintaxLabel);
+      autospintaxBtn.addEventListener('click', function() { runAutospintax(); });
+      toolbar.appendChild(autospintaxBtn);
+
       var spacer = document.createElement('div');
       spacer.className = 'toolbar-spacer';
       toolbar.appendChild(spacer);
+
+      // Spam checker toggle
+      var spamBtn = document.createElement('button');
+      spamBtn.type = 'button';
+      spamBtn.className = 'spam-toggle-btn' + (spamPanelOpen ? ' active' : '');
+      spamBtn.id = 'spam-toggle';
+      spamBtn.title = 'Toggle spam checker panel';
+      var shieldSvg = makeSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>');
+      spamBtn.appendChild(shieldSvg);
+      var spamLabel = document.createElement('span');
+      spamLabel.textContent = 'Spam Check';
+      spamBtn.appendChild(spamLabel);
+      spamBtn.addEventListener('click', function() { toggleSpamPanel(); });
+      toolbar.appendChild(spamBtn);
 
       var previewBtn = document.createElement('button');
       previewBtn.type = 'button';
@@ -1056,6 +1287,13 @@ function buildClientScripts(template) {
 
       bodyField.appendChild(toolbar);
 
+      // Wrapper for body editor + spam panel side by side
+      var editorWithSpam = document.createElement('div');
+      editorWithSpam.className = 'editor-with-spam';
+
+      var editorMain = document.createElement('div');
+      editorMain.className = 'editor-main';
+
       // Contenteditable body area
       // This contains the template author's own content (not untrusted user input).
       // Reading innerHTML to save is acceptable per project conventions.
@@ -1065,11 +1303,24 @@ function buildClientScripts(template) {
       bodyEl.contentEditable = 'true';
       bodyEl.innerHTML = step.body;
       bodyEl.addEventListener('focus', function() { lastFocusedField = 'body'; });
-      bodyEl.addEventListener('input', function() { debouncePreviewUpdate(); });
+      bodyEl.addEventListener('input', function() {
+        debouncePreviewUpdate();
+        debounceSpamUpdate();
+      });
       /* Track selection changes for toolbar active state */
       bodyEl.addEventListener('keyup', updateToolbarState);
       bodyEl.addEventListener('mouseup', updateToolbarState);
-      bodyField.appendChild(bodyEl);
+      editorMain.appendChild(bodyEl);
+      editorWithSpam.appendChild(editorMain);
+
+      // Spam checker panel
+      var spamPanel = document.createElement('div');
+      spamPanel.className = 'spam-panel' + (spamPanelOpen ? ' open' : '');
+      spamPanel.id = 'spam-panel';
+      editorWithSpam.appendChild(spamPanel);
+      if (spamPanelOpen) { setTimeout(function() { updateSpamPanel(); }, 0); }
+
+      bodyField.appendChild(editorWithSpam);
 
       // Preview panel
       var previewPanel = document.createElement('div');
@@ -1336,6 +1587,372 @@ function buildClientScripts(template) {
         saveBtn.classList.remove('saving');
         alert('Error: ' + err.message);
       });
+    }
+
+    /* ============================================================
+     * Autospintax
+     * ============================================================ */
+    var SPINTAX_DICTIONARY = [
+      { match: /\\bjust following up\\b/gi, replace: '{{Just following up|Wanted to circle back|Bumping this to the top of your inbox}}' },
+      { match: /\\bfollowing up\\b/gi, replace: '{{following up|circling back|checking in}}' },
+      { match: /\\bhope you're well\\b/gi, replace: "{{Hope you're well|Hope you're doing great|Trust you're doing well}}" },
+      { match: /\\bhope this finds you well\\b/gi, replace: "{{Hope this finds you well|Hope you're having a great week|Trust all is well}}" },
+      { match: /\\blet me know\\b/gi, replace: '{{let me know|feel free to share|happy to hear your thoughts}}' },
+      { match: /\\bwould love to\\b/gi, replace: '{{would love to|would be great to|would be happy to}}' },
+      { match: /\\bhappy to\\b/gi, replace: '{{happy to|glad to|pleased to}}' },
+      { match: /\\bquick question\\b/gi, replace: '{{quick question|brief question|short question}}' },
+      { match: /\\bI wanted to reach out\\b/gi, replace: '{{I wanted to reach out|I thought I would reach out|I wanted to connect}}' },
+      { match: /\\breaching out\\b/gi, replace: '{{reaching out|getting in touch|connecting}}' },
+      { match: /\\btouching base\\b/gi, replace: '{{touching base|checking in|following up}}' },
+      { match: /\\bwhen you get a chance\\b/gi, replace: '{{when you get a chance|when you have a moment|at your convenience}}' },
+      { match: /\\blooking forward\\b/gi, replace: '{{looking forward|excited|eager}}' },
+      { match: /\\bthank you\\b/gi, replace: '{{Thank you|Thanks|Thanks so much}}' },
+      { match: /\\bthanks\\b/gi, replace: '{{Thanks|Cheers|Best}}' },
+      { match: /\\bbest regards\\b/gi, replace: '{{Best regards|Best|Kind regards|Cheers}}' },
+      { match: /\\bI think\\b/gi, replace: '{{I think|I believe|I feel}}' },
+      { match: /\\bgreat fit\\b/gi, replace: '{{great fit|strong fit|good match}}' },
+      { match: /\\bschedule a call\\b/gi, replace: '{{schedule a call|find time to chat|hop on a quick call}}' },
+      { match: /\\bshare more\\b/gi, replace: '{{share more|send over details|walk you through it}}' }
+    ];
+
+    function runAutospintax() {
+      var bodyEl = document.getElementById('step-body');
+      if (!bodyEl) return;
+
+      var html = bodyEl.innerHTML;
+      var count = 0;
+
+      // Temporarily replace existing {{...}} blocks with placeholders
+      var existingBlocks = [];
+      html = html.replace(/\\{\\{[^}]+\\}\\}/g, function(m) {
+        existingBlocks.push(m);
+        return '%%SPINTAX_PLACEHOLDER_' + (existingBlocks.length - 1) + '%%';
+      });
+
+      // Run dictionary replacements on remaining text
+      for (var i = 0; i < SPINTAX_DICTIONARY.length; i++) {
+        var entry = SPINTAX_DICTIONARY[i];
+        html = html.replace(entry.match, function() {
+          count++;
+          return entry.replace;
+        });
+      }
+
+      // Restore original {{...}} blocks
+      html = html.replace(/%%SPINTAX_PLACEHOLDER_(\\d+)%%/g, function(_m, idx) {
+        return existingBlocks[parseInt(idx)];
+      });
+
+      bodyEl.innerHTML = html;
+      debouncePreviewUpdate();
+      debounceSpamUpdate();
+      showAutospintaxToast(count);
+    }
+
+    function showAutospintaxToast(count) {
+      var existing = document.getElementById('autospintax-toast');
+      if (existing) existing.parentNode.removeChild(existing);
+
+      var toast = document.createElement('div');
+      toast.className = 'autospintax-toast';
+      toast.id = 'autospintax-toast';
+      toast.textContent = count > 0
+        ? 'Replaced ' + count + ' phrase' + (count !== 1 ? 's' : '') + ' with spintax'
+        : 'No matching phrases found';
+      document.body.appendChild(toast);
+
+      // Force reflow then show
+      toast.offsetHeight;
+      toast.classList.add('visible');
+
+      setTimeout(function() {
+        toast.classList.remove('visible');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 250);
+      }, 2200);
+    }
+
+    /* ============================================================
+     * Spam Checker Panel
+     * ============================================================ */
+    var spamPanelOpen = false;
+    var spamDebounceTimer = null;
+
+    var SPAM_WORDS_RED = ['free', 'buy now', 'act now', 'limited time', 'click here',
+      'no obligation', 'risk-free', 'winner', 'congratulations', 'urgent', '100%',
+      'guarantee', 'earn money', 'make money', 'cash', 'credit', 'discount', 'deal',
+      'offer', 'lowest price', 'order now', 'subscribe', 'no cost'];
+    var SPAM_WORDS_ORANGE = ['opportunity', 'amazing', 'incredible', 'exclusive',
+      'special', 'bonus', 'profit', 'income', 'investment', 'affordable'];
+    var SPAM_WORDS_YELLOW = ['reminder', 'help', 'improve', 'solution', 'results',
+      'success', 'easy', 'simple', 'proven', 'effective'];
+
+    function toggleSpamPanel() {
+      spamPanelOpen = !spamPanelOpen;
+      var panel = document.getElementById('spam-panel');
+      var btn = document.getElementById('spam-toggle');
+      if (!panel) return;
+      if (spamPanelOpen) {
+        panel.classList.add('open');
+        if (btn) btn.classList.add('active');
+        updateSpamPanel();
+      } else {
+        panel.classList.remove('open');
+        if (btn) btn.classList.remove('active');
+      }
+    }
+
+    function debounceSpamUpdate() {
+      if (spamDebounceTimer) clearTimeout(spamDebounceTimer);
+      spamDebounceTimer = setTimeout(function() {
+        if (spamPanelOpen) updateSpamPanel();
+      }, 500);
+    }
+
+    function findSpamWords(text, wordList) {
+      var found = [];
+      for (var i = 0; i < wordList.length; i++) {
+        var word = wordList[i];
+        var escaped = word.replace(/[.*+?^\\\\|(){}[\\]]/g, function(c) { return '\\\\' + c; });
+        var regex = new RegExp('\\\\b' + escaped + '\\\\b', 'gi');
+        if (regex.test(text)) {
+          found.push(word);
+        }
+      }
+      return found;
+    }
+
+    function analyzeSpam(bodyHtml, subjectText) {
+      // Strip HTML tags for text analysis
+      var text = bodyHtml.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();
+      var fullText = (subjectText + ' ' + text).toLowerCase();
+
+      // Count words (approximate spintax by using first option)
+      var plainText = fullText.replace(/\\{\\{([^}]*)\\}\\}/g, function(m, inner) {
+        if (inner.indexOf('|') !== -1) return inner.split('|')[0];
+        return inner;
+      });
+      var wordCount = plainText.split(/\\s+/).filter(Boolean).length;
+
+      // Count spintax/variable blocks
+      var spintaxMatches = fullText.match(/\\{\\{[^}]+\\}\\}/g) || [];
+      var spintaxPercent = wordCount > 0 ? Math.round((spintaxMatches.length / wordCount) * 100) : 0;
+
+      // Count spam words by severity
+      var redFound = findSpamWords(fullText, SPAM_WORDS_RED);
+      var orangeFound = findSpamWords(fullText, SPAM_WORDS_ORANGE);
+      var yellowFound = findSpamWords(fullText, SPAM_WORDS_YELLOW);
+
+      // Count links, images, emojis
+      var linkCount = (bodyHtml.match(/<a\\b/gi) || []).length;
+      var urlsInText = text.match(/https?:\\/\\/\\S+/gi) || [];
+      linkCount += urlsInText.length;
+      var imageCount = (bodyHtml.match(/<img\\b/gi) || []).length;
+      var emojiCount = 0;
+      try {
+        var emojiMatches = text.match(/[\\u{1F600}-\\u{1F64F}\\u{1F300}-\\u{1F5FF}\\u{1F680}-\\u{1F6FF}\\u{1F900}-\\u{1F9FF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}]/gu);
+        emojiCount = emojiMatches ? emojiMatches.length : 0;
+      } catch(e) { emojiCount = 0; }
+
+      // Compute overall score
+      var score = 0;
+      score += redFound.length * 10;
+      score += orangeFound.length * 5;
+      score += yellowFound.length * 2;
+      score += Math.max(0, linkCount * 15);
+      score += Math.max(0, imageCount * 10);
+      score += Math.max(0, (emojiCount - 1) * 5);
+      if (wordCount < 25 || wordCount > 100) score += 10;
+      if (spintaxPercent < 5) score += 10;
+      score = Math.min(100, score);
+
+      return {
+        score: score,
+        spamWords: { red: redFound, orange: orangeFound, yellow: yellowFound },
+        spintaxPercent: spintaxPercent,
+        linkCount: linkCount,
+        imageCount: imageCount,
+        emojiCount: emojiCount,
+        wordCount: wordCount
+      };
+    }
+
+    function severityColor(level) {
+      if (level === 'green') return '#22c55e';
+      if (level === 'yellow') return '#eab308';
+      return '#ef4444';
+    }
+
+    function scoreColor(score) {
+      if (score < 30) return '#22c55e';
+      if (score <= 60) return '#eab308';
+      return '#ef4444';
+    }
+
+    function updateSpamPanel() {
+      var panel = document.getElementById('spam-panel');
+      if (!panel) return;
+      while (panel.firstChild) panel.removeChild(panel.firstChild);
+
+      var bodyEl = document.getElementById('step-body');
+      var subjectEl = document.getElementById('step-subject');
+      var bodyHtml = bodyEl ? bodyEl.innerHTML : '';
+      var subjectText = subjectEl ? subjectEl.value : '';
+      var data = analyzeSpam(bodyHtml, subjectText);
+
+      // Title
+      var title = document.createElement('div');
+      title.className = 'spam-panel-title';
+      title.textContent = 'Spam Analysis';
+      panel.appendChild(title);
+
+      // Ring chart for overall score
+      var ringWrap = document.createElement('div');
+      ringWrap.className = 'spam-score-ring';
+      var ringSize = 80;
+      var radius = 32;
+      var circumference = 2 * Math.PI * radius;
+      var dashLen = (data.score / 100) * circumference;
+      var ringColor = scoreColor(data.score);
+
+      var svgNS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('width', String(ringSize));
+      svg.setAttribute('height', String(ringSize));
+      svg.setAttribute('viewBox', '0 0 ' + ringSize + ' ' + ringSize);
+
+      var bgCircle = document.createElementNS(svgNS, 'circle');
+      bgCircle.setAttribute('cx', String(ringSize/2));
+      bgCircle.setAttribute('cy', String(ringSize/2));
+      bgCircle.setAttribute('r', String(radius));
+      bgCircle.setAttribute('fill', 'none');
+      bgCircle.setAttribute('stroke', '#27272a');
+      bgCircle.setAttribute('stroke-width', '5');
+      svg.appendChild(bgCircle);
+
+      var fgCircle = document.createElementNS(svgNS, 'circle');
+      fgCircle.setAttribute('cx', String(ringSize/2));
+      fgCircle.setAttribute('cy', String(ringSize/2));
+      fgCircle.setAttribute('r', String(radius));
+      fgCircle.setAttribute('fill', 'none');
+      fgCircle.setAttribute('stroke', ringColor);
+      fgCircle.setAttribute('stroke-width', '5');
+      fgCircle.setAttribute('stroke-dasharray', dashLen + ' ' + (circumference - dashLen));
+      fgCircle.setAttribute('stroke-dashoffset', String(circumference * 0.25));
+      fgCircle.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(fgCircle);
+
+      var scoreText = document.createElementNS(svgNS, 'text');
+      scoreText.setAttribute('x', String(ringSize/2));
+      scoreText.setAttribute('y', String(ringSize/2 + 1));
+      scoreText.setAttribute('text-anchor', 'middle');
+      scoreText.setAttribute('dominant-baseline', 'middle');
+      scoreText.setAttribute('fill', ringColor);
+      scoreText.setAttribute('font-size', '18');
+      scoreText.setAttribute('font-weight', '700');
+      scoreText.setAttribute('font-family', 'inherit');
+      scoreText.textContent = data.score + '%';
+      svg.appendChild(scoreText);
+
+      ringWrap.appendChild(svg);
+      var ringLabel = document.createElement('div');
+      ringLabel.className = 'spam-score-label';
+      ringLabel.textContent = data.score < 30 ? 'Low spam risk' : data.score <= 60 ? 'Moderate spam risk' : 'High spam risk';
+      ringWrap.appendChild(ringLabel);
+      panel.appendChild(ringWrap);
+
+      // Helper to add a metric row
+      function addMetric(label, value, barPercent, severity) {
+        var metric = document.createElement('div');
+        metric.className = 'spam-metric';
+        var header = document.createElement('div');
+        header.className = 'spam-metric-header';
+        var lbl = document.createElement('span');
+        lbl.className = 'spam-metric-label';
+        lbl.textContent = label;
+        header.appendChild(lbl);
+        var val = document.createElement('span');
+        val.className = 'spam-metric-value';
+        val.style.color = severityColor(severity);
+        val.textContent = String(value);
+        header.appendChild(val);
+        metric.appendChild(header);
+
+        var bar = document.createElement('div');
+        bar.className = 'spam-bar';
+        var marker = document.createElement('div');
+        marker.className = 'spam-bar-marker';
+        marker.style.left = Math.min(100, Math.max(0, barPercent)) + '%';
+        bar.appendChild(marker);
+        metric.appendChild(bar);
+        return metric;
+      }
+
+      // Spam Words metric
+      var totalSpamWords = data.spamWords.red.length + data.spamWords.orange.length + data.spamWords.yellow.length;
+      var spamWordSeverity = data.spamWords.red.length > 0 ? 'red' : data.spamWords.orange.length > 0 ? 'yellow' : 'green';
+      var spamBarPct = Math.min(100, totalSpamWords * 10);
+      var spamMetric = addMetric('Spam Words', totalSpamWords, spamBarPct, spamWordSeverity);
+
+      // Show found spam words as tags
+      if (totalSpamWords > 0) {
+        var tags = document.createElement('div');
+        tags.className = 'spam-word-tags';
+        function addTags(words, cls) {
+          for (var i = 0; i < words.length; i++) {
+            var tag = document.createElement('span');
+            tag.className = 'spam-word-tag ' + cls;
+            tag.textContent = words[i];
+            tags.appendChild(tag);
+          }
+        }
+        addTags(data.spamWords.red, 'red');
+        addTags(data.spamWords.orange, 'orange');
+        addTags(data.spamWords.yellow, 'yellow');
+        spamMetric.appendChild(tags);
+      }
+      panel.appendChild(spamMetric);
+
+      // Spintax & Variables
+      var spintaxSeverity = data.spintaxPercent >= 10 ? 'green' : data.spintaxPercent >= 5 ? 'yellow' : 'red';
+      panel.appendChild(addMetric('Spintax & Variables', data.spintaxPercent + '%', Math.min(100, data.spintaxPercent * 5), spintaxSeverity));
+
+      // Links
+      var linkSeverity = data.linkCount === 0 ? 'green' : data.linkCount <= 2 ? 'yellow' : 'red';
+      var linkMetric = addMetric('Links', data.linkCount, Math.min(100, data.linkCount * 25), linkSeverity);
+      panel.appendChild(linkMetric);
+
+      // Images
+      var imgSeverity = data.imageCount === 0 ? 'green' : data.imageCount === 1 ? 'yellow' : 'red';
+      panel.appendChild(addMetric('Images', data.imageCount, Math.min(100, data.imageCount * 35), imgSeverity));
+
+      // Emojis
+      var emojiSeverity = data.emojiCount <= 1 ? 'green' : data.emojiCount <= 3 ? 'yellow' : 'red';
+      panel.appendChild(addMetric('Emojis', data.emojiCount, Math.min(100, data.emojiCount * 15), emojiSeverity));
+
+      // Word Count
+      var wcSeverity = (data.wordCount >= 25 && data.wordCount <= 100) ? 'green'
+        : ((data.wordCount >= 15 && data.wordCount < 25) || (data.wordCount > 100 && data.wordCount <= 150)) ? 'yellow' : 'red';
+      var wcBarPct = Math.min(100, (data.wordCount / 150) * 100);
+      panel.appendChild(addMetric('Word Count', data.wordCount, wcBarPct, wcSeverity));
+
+      // Recommendations
+      var recs = [];
+      if (data.spamWords.red.length > 0) recs.push('Remove high-severity spam trigger words.');
+      if (data.linkCount > 0) recs.push('Avoid hyperlinks \\u2014 use plain text URLs instead.');
+      if (data.imageCount > 0) recs.push('Minimize images to improve deliverability.');
+      if (data.spintaxPercent < 5) recs.push('Add more spintax or variables for personalization.');
+      if (data.wordCount < 25) recs.push('Email body is very short \\u2014 add more context.');
+      if (data.wordCount > 100) recs.push('Consider shortening your email for better engagement.');
+      if (data.emojiCount > 3) recs.push('Reduce emoji usage to avoid spam filters.');
+
+      if (recs.length > 0) {
+        var recBox = document.createElement('div');
+        recBox.className = 'spam-recommendation';
+        recBox.textContent = recs.join(' ');
+        panel.appendChild(recBox);
+      }
     }
 
     // Initial render
