@@ -1011,27 +1011,35 @@
     // Detect view changes and fetch data only when needed
     let lastUrl = location.href;
     
+    function isSentView() {
+      return location.hash.startsWith('#sent');
+    }
+
     function handleViewChange() {
       const newView = location.hash;
-      console.log(LOG, 'URL changed to:', newView);
-      
-      // Only process if we're actually changing to sent folder view
-      if (newView !== currentView && newView === '#sent') {
+
+      // Detect entering sent folder (match #sent, #sent/, #sent?compose=, etc.)
+      if (newView !== currentView && isSentView()) {
         currentView = newView;
         console.log(LOG, 'Entered sent folder, loading indicators');
-        // Clear cache on view change to force fresh data
         trackingDataCache = null;
         setTimeout(() => addInboxReadIndicators(), 1000);
       } else if (newView !== currentView) {
         currentView = newView;
-        console.log(LOG, 'Changed to:', currentView, '- not sent folder, skipping');
       }
     }
-    
-    // Initial load - only if already in sent
-    if (location.hash === '#sent') {
-      handleViewChange();
+
+    // Initial load - if already in sent
+    if (isSentView()) {
+      setTimeout(() => addInboxReadIndicators(), 1500);
     }
+
+    // Refresh indicators periodically while in sent view
+    setInterval(() => {
+      if (isSentView()) {
+        addInboxReadIndicators();
+      }
+    }, 30000); // Every 30 seconds
     
     // Watch for URL changes with polling instead of MutationObserver
     setInterval(() => {
