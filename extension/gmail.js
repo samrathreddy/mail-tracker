@@ -517,6 +517,17 @@
     } catch { return []; }
   }
 
+  function setSequenceBtnState(btn, svgEl, selected, tooltipText) {
+    if (selected) {
+      btn.style.background = 'rgba(59,130,246,0.15)';
+      svgEl.style.color = '#60a5fa';
+    } else {
+      btn.style.background = '#3f3f46';
+      svgEl.style.color = '#94a3b8';
+    }
+    btn.title = tooltipText;
+  }
+
   function injectSequenceSelector(composeForm) {
     if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
 
@@ -529,23 +540,43 @@
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.style.cssText = 'background:#3f3f46;color:#a1a1aa;border:1px solid #52525b;border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;';
+    btn.style.cssText = 'background:#3f3f46;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;';
+    btn.title = 'Select sequence';
     btn.setAttribute('data-selected-template', '');
 
-    const iconSpan = document.createElement('span');
-    iconSpan.style.fontSize = '14px';
-    iconSpan.textContent = '📋';
-    btn.appendChild(iconSpan);
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('fill', 'none');
+    svg.style.color = '#94a3b8';
 
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'seq-label';
-    labelSpan.textContent = 'No sequence';
-    btn.appendChild(labelSpan);
+    // Three connected dots forming a vertical timeline
+    var c1 = document.createElementNS(svgNS, 'circle');
+    c1.setAttribute('cx', '8'); c1.setAttribute('cy', '3'); c1.setAttribute('r', '2');
+    c1.setAttribute('fill', 'currentColor');
+    var c2 = document.createElementNS(svgNS, 'circle');
+    c2.setAttribute('cx', '8'); c2.setAttribute('cy', '8'); c2.setAttribute('r', '2');
+    c2.setAttribute('fill', 'currentColor');
+    var c3 = document.createElementNS(svgNS, 'circle');
+    c3.setAttribute('cx', '8'); c3.setAttribute('cy', '13'); c3.setAttribute('r', '2');
+    c3.setAttribute('fill', 'currentColor');
+    var line1 = document.createElementNS(svgNS, 'line');
+    line1.setAttribute('x1', '8'); line1.setAttribute('y1', '5');
+    line1.setAttribute('x2', '8'); line1.setAttribute('y2', '6');
+    line1.setAttribute('stroke', 'currentColor'); line1.setAttribute('stroke-width', '1.5');
+    var line2 = document.createElementNS(svgNS, 'line');
+    line2.setAttribute('x1', '8'); line2.setAttribute('y1', '10');
+    line2.setAttribute('x2', '8'); line2.setAttribute('y2', '11');
+    line2.setAttribute('stroke', 'currentColor'); line2.setAttribute('stroke-width', '1.5');
 
-    const arrowSpan = document.createElement('span');
-    arrowSpan.style.fontSize = '10px';
-    arrowSpan.textContent = '▾';
-    btn.appendChild(arrowSpan);
+    svg.appendChild(c1);
+    svg.appendChild(line1);
+    svg.appendChild(c2);
+    svg.appendChild(line2);
+    svg.appendChild(c3);
+    btn.appendChild(svg);
 
     const dropdown = document.createElement('div');
     dropdown.style.cssText = 'display:none;position:absolute;bottom:100%;left:0;background:#27272a;border:1px solid #52525b;border-radius:10px;padding:6px 0;min-width:220px;z-index:9999;margin-bottom:4px;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
@@ -572,9 +603,9 @@
       noSeq.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
       noSeq.textContent = 'No sequence';
       noSeq.addEventListener('click', function() {
-        labelSpan.textContent = 'No sequence';
         btn.setAttribute('data-selected-template', '');
         btn.setAttribute('data-oneoff-steps', '');
+        setSequenceBtnState(btn, svg, false, 'Select sequence');
         dropdown.style.display = 'none';
       });
       noSeq.addEventListener('mouseenter', function() { noSeq.style.background = '#3f3f46'; });
@@ -596,9 +627,9 @@
           item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
           item.textContent = tmpl.name + ' (' + tmpl.steps.length + ' steps)';
           item.addEventListener('click', function() {
-            labelSpan.textContent = tmpl.name;
             btn.setAttribute('data-selected-template', tmpl.id);
             btn.setAttribute('data-oneoff-steps', '');
+            setSequenceBtnState(btn, svg, true, tmpl.name);
             dropdown.style.display = 'none';
           });
           item.addEventListener('mouseenter', function() { item.style.background = '#3f3f46'; });
@@ -619,7 +650,7 @@
       oneOff.addEventListener('mouseleave', function() { oneOff.style.background = 'none'; });
       oneOff.addEventListener('click', function() {
         dropdown.style.display = 'none';
-        showOneOffBuilder(container, btn, labelSpan);
+        showOneOffBuilder(container, btn, svg);
       });
       dropdown.appendChild(oneOff);
     });
@@ -641,80 +672,293 @@
     sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
   }
 
-  function showOneOffBuilder(container, btn, labelSpan) {
-    var existing = container.parentElement.querySelector('.oneoff-builder');
-    if (existing) existing.remove();
+  function _insertTextAtCursor(textarea, text) {
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var val = textarea.value;
+    textarea.value = val.substring(0, start) + text + val.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + text.length;
+    textarea.focus();
+  }
 
-    var builder = document.createElement('div');
-    builder.className = 'oneoff-builder';
-    builder.style.cssText = 'background:#27272a;border:1px solid #52525b;border-radius:10px;padding:12px;margin-top:8px;font-size:12px;color:#e4e4e7;';
+  function _wrapSelectionWith(textarea, openTag, closeTag) {
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var val = textarea.value;
+    var selected = val.substring(start, end);
+    var replacement = openTag + selected + closeTag;
+    textarea.value = val.substring(0, start) + replacement + val.substring(end);
+    textarea.selectionStart = start + openTag.length;
+    textarea.selectionEnd = start + openTag.length + selected.length;
+    textarea.focus();
+  }
 
-    var title = document.createElement('div');
-    title.style.cssText = 'font-weight:600;margin-bottom:8px;';
-    title.textContent = 'One-off Follow-up';
-    builder.appendChild(title);
+  function _getComposeData(container) {
+    var form = container.closest('[role="dialog"]') || container.closest('.nH') || container.closest('form');
+    var recipient = '';
+    var subject = '';
+    if (form) {
+      var emailEl = form.querySelector('span[email]');
+      if (emailEl) recipient = emailEl.getAttribute('email') || '';
+      var subEl = form.querySelector('input[name="subjectbox"]') ||
+                  form.querySelector('input[aria-label*="Subject"]');
+      if (subEl) subject = subEl.value || '';
+    }
+    var firstName = recipient.split('@')[0] || '';
+    // Capitalize first letter
+    firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    return { recipient: recipient, subject: subject, firstName: firstName };
+  }
 
+  function _substituteVariables(text, data) {
+    return text
+      .replace(/\{\{firstName\}\}/g, data.firstName)
+      .replace(/\{\{subject\}\}/g, data.subject)
+      .replace(/\{\{daysSince\}\}/g, '0');
+  }
+
+  function _buildStepUI(stepIndex, stepsContainer, _allStepsData, _maxSteps) {
+    var stepDiv = document.createElement('div');
+    stepDiv.setAttribute('data-step-index', String(stepIndex));
+    if (stepIndex > 0) {
+      stepDiv.style.cssText = 'border-top:1px solid #e2e5e9;padding-top:10px;margin-top:10px;';
+    }
+
+    var stepHeader = document.createElement('div');
+    stepHeader.style.cssText = 'font-weight:600;font-size:12px;color:#1f2937;margin-bottom:6px;';
+    stepHeader.textContent = 'Step ' + (stepIndex + 1);
+    stepDiv.appendChild(stepHeader);
+
+    // Delay
     var delayLabel = document.createElement('label');
-    delayLabel.style.cssText = 'color:#a1a1aa;font-size:11px;';
+    delayLabel.style.cssText = 'color:#6b7280;font-size:11px;display:block;margin-bottom:2px;';
     delayLabel.textContent = 'Send after (days):';
-    builder.appendChild(delayLabel);
+    stepDiv.appendChild(delayLabel);
     var delayInput = document.createElement('input');
     delayInput.type = 'number';
     delayInput.min = '1';
     delayInput.max = '90';
-    delayInput.value = '2';
-    delayInput.style.cssText = 'background:#3f3f46;color:#e4e4e7;border:1px solid #52525b;border-radius:6px;padding:4px 8px;width:60px;margin:4px 0 8px;display:block;';
-    builder.appendChild(delayInput);
+    delayInput.value = stepIndex === 0 ? '2' : String((stepIndex + 1) * 2);
+    delayInput.style.cssText = 'background:white;color:#1f2937;border:1px solid #d1d5db;border-radius:6px;padding:4px 8px;width:60px;margin-bottom:8px;display:block;font-size:12px;';
+    stepDiv.appendChild(delayInput);
 
+    // Subject
     var subLabel = document.createElement('label');
-    subLabel.style.cssText = 'color:#a1a1aa;font-size:11px;';
+    subLabel.style.cssText = 'color:#6b7280;font-size:11px;display:block;margin-bottom:2px;';
     subLabel.textContent = 'Subject:';
-    builder.appendChild(subLabel);
+    stepDiv.appendChild(subLabel);
     var subInput = document.createElement('input');
     subInput.type = 'text';
     subInput.placeholder = 'Re: {{subject}}';
-    subInput.style.cssText = 'background:#3f3f46;color:#e4e4e7;border:1px solid #52525b;border-radius:6px;padding:4px 8px;width:100%;margin:4px 0 8px;display:block;';
-    builder.appendChild(subInput);
+    subInput.style.cssText = 'background:white;color:#1f2937;border:1px solid #d1d5db;border-radius:6px;padding:4px 8px;width:100%;margin-bottom:8px;display:block;box-sizing:border-box;font-size:12px;';
+    stepDiv.appendChild(subInput);
 
+    // Body label
     var bodyLabel = document.createElement('label');
-    bodyLabel.style.cssText = 'color:#a1a1aa;font-size:11px;';
+    bodyLabel.style.cssText = 'color:#6b7280;font-size:11px;display:block;margin-bottom:2px;';
     bodyLabel.textContent = 'Body:';
-    builder.appendChild(bodyLabel);
-    var bodyInput = document.createElement('textarea');
-    bodyInput.placeholder = 'Hi {{firstName}}, just following up...';
-    bodyInput.style.cssText = 'background:#3f3f46;color:#e4e4e7;border:1px solid #52525b;border-radius:6px;padding:4px 8px;width:100%;height:60px;margin:4px 0 8px;display:block;resize:vertical;';
-    builder.appendChild(bodyInput);
+    stepDiv.appendChild(bodyLabel);
 
+    // Variable pills row
+    var pillRow = document.createElement('div');
+    pillRow.style.cssText = 'display:flex;gap:4px;margin-bottom:4px;flex-wrap:wrap;';
+    var variables = ['{{firstName}}', '{{subject}}', '{{daysSince}}'];
+    var bodyTextarea = document.createElement('textarea');
+    variables.forEach(function(v) {
+      var pill = document.createElement('button');
+      pill.type = 'button';
+      pill.textContent = v;
+      pill.style.cssText = 'background:#dbeafe;color:#3b82f6;border:none;border-radius:12px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:inherit;';
+      pill.addEventListener('click', function() {
+        _insertTextAtCursor(bodyTextarea, v);
+      });
+      pillRow.appendChild(pill);
+    });
+    stepDiv.appendChild(pillRow);
+
+    // Mini formatting toolbar
+    var toolbarRow = document.createElement('div');
+    toolbarRow.style.cssText = 'display:flex;gap:4px;margin-bottom:4px;';
+
+    var boldBtn = document.createElement('button');
+    boldBtn.type = 'button';
+    boldBtn.textContent = 'B';
+    boldBtn.style.cssText = 'background:white;color:#1f2937;border:1px solid #d1d5db;border-radius:4px;width:24px;height:24px;font-size:12px;font-weight:700;cursor:pointer;padding:0;line-height:24px;text-align:center;';
+    boldBtn.addEventListener('click', function() {
+      _wrapSelectionWith(bodyTextarea, '<b>', '</b>');
+    });
+    toolbarRow.appendChild(boldBtn);
+
+    var italicBtn = document.createElement('button');
+    italicBtn.type = 'button';
+    italicBtn.textContent = 'I';
+    italicBtn.style.cssText = 'background:white;color:#1f2937;border:1px solid #d1d5db;border-radius:4px;width:24px;height:24px;font-size:12px;font-style:italic;cursor:pointer;padding:0;line-height:24px;text-align:center;';
+    italicBtn.addEventListener('click', function() {
+      _wrapSelectionWith(bodyTextarea, '<i>', '</i>');
+    });
+    toolbarRow.appendChild(italicBtn);
+
+    // Preview toggle button
+    var previewToggle = document.createElement('button');
+    previewToggle.type = 'button';
+    previewToggle.textContent = 'Preview';
+    previewToggle.style.cssText = 'background:none;color:#3b82f6;border:none;font-size:11px;cursor:pointer;margin-left:auto;padding:2px 4px;';
+    toolbarRow.appendChild(previewToggle);
+
+    stepDiv.appendChild(toolbarRow);
+
+    // Body textarea
+    bodyTextarea.placeholder = 'Hi {{firstName}}, just following up...';
+    bodyTextarea.style.cssText = 'background:white;color:#1f2937;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;width:100%;height:60px;margin-bottom:8px;display:block;resize:vertical;box-sizing:border-box;font-size:12px;font-family:inherit;';
+    stepDiv.appendChild(bodyTextarea);
+
+    // Preview div (hidden initially)
+    var previewDiv = document.createElement('div');
+    previewDiv.style.cssText = 'background:white;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;width:100%;min-height:60px;margin-bottom:8px;display:none;box-sizing:border-box;font-size:12px;color:#1f2937;white-space:pre-wrap;word-break:break-word;';
+    stepDiv.appendChild(previewDiv);
+
+    var isPreviewMode = false;
+    previewToggle.addEventListener('click', function() {
+      if (!isPreviewMode) {
+        // Switch to preview
+        var data = _getComposeData(stepsContainer);
+        var raw = _substituteVariables(bodyTextarea.value, data);
+        // Render preview safely using DOM
+        previewDiv.textContent = '';
+        // Parse simple HTML tags for preview: split on <b>, </b>, <i>, </i>
+        var tempDiv = document.createElement('div');
+        // Safe: we build text nodes from substituted content
+        // For preview, render the raw text (with tags visible) as text content
+        tempDiv.textContent = raw;
+        previewDiv.appendChild(tempDiv);
+        bodyTextarea.style.display = 'none';
+        previewDiv.style.display = 'block';
+        previewToggle.textContent = 'Edit';
+        isPreviewMode = true;
+      } else {
+        // Switch back to edit
+        bodyTextarea.style.display = 'block';
+        previewDiv.style.display = 'none';
+        previewToggle.textContent = 'Preview';
+        isPreviewMode = false;
+      }
+    });
+
+    // Stop conditions
     var stopDiv = document.createElement('div');
-    stopDiv.style.cssText = 'margin-bottom:8px;';
+    stopDiv.style.cssText = 'margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap;';
+
     var replyCheck = document.createElement('input');
     replyCheck.type = 'checkbox';
     replyCheck.checked = true;
+    replyCheck.id = 'stop-reply-' + stepIndex + '-' + Date.now();
     var replyLbl = document.createElement('label');
-    replyLbl.style.cssText = 'font-size:11px;color:#a1a1aa;';
+    replyLbl.style.cssText = 'font-size:11px;color:#6b7280;display:flex;align-items:center;gap:3px;cursor:pointer;';
     replyLbl.appendChild(replyCheck);
-    replyLbl.appendChild(document.createTextNode(' Stop on reply'));
+    replyLbl.appendChild(document.createTextNode('Stop on reply'));
     stopDiv.appendChild(replyLbl);
-    builder.appendChild(stopDiv);
 
+    var openCheck = document.createElement('input');
+    openCheck.type = 'checkbox';
+    openCheck.checked = false;
+    openCheck.id = 'stop-open-' + stepIndex + '-' + Date.now();
+    var openLbl = document.createElement('label');
+    openLbl.style.cssText = 'font-size:11px;color:#6b7280;display:flex;align-items:center;gap:3px;cursor:pointer;';
+    openLbl.appendChild(openCheck);
+    openLbl.appendChild(document.createTextNode('Stop on open'));
+    stopDiv.appendChild(openLbl);
+
+    stepDiv.appendChild(stopDiv);
+
+    // Store references for data collection
+    stepDiv._delayInput = delayInput;
+    stepDiv._subInput = subInput;
+    stepDiv._bodyTextarea = bodyTextarea;
+    stepDiv._replyCheck = replyCheck;
+    stepDiv._openCheck = openCheck;
+
+    return stepDiv;
+  }
+
+  function showOneOffBuilder(container, btn, svgEl) {
+    var existing = container.parentElement.querySelector('.oneoff-builder');
+    if (existing) existing.remove();
+
+    var maxSteps = 3;
+
+    var builder = document.createElement('div');
+    builder.className = 'oneoff-builder';
+    builder.style.cssText = 'background:#f8f9fa;border:1px solid #e2e5e9;border-radius:10px;padding:14px;margin-top:8px;font-size:12px;color:#1f2937;';
+
+    var title = document.createElement('div');
+    title.style.cssText = 'font-weight:600;margin-bottom:10px;color:#1f2937;font-size:13px;';
+    title.textContent = 'One-off Follow-up';
+    builder.appendChild(title);
+
+    var stepsContainer = document.createElement('div');
+    builder.appendChild(stepsContainer);
+
+    // Add first step
+    var firstStep = _buildStepUI(0, stepsContainer, [], maxSteps);
+    stepsContainer.appendChild(firstStep);
+
+    // "Add another step" link container
+    var addStepRow = document.createElement('div');
+    addStepRow.style.cssText = 'margin-top:6px;margin-bottom:10px;';
+
+    var addStepLink = document.createElement('a');
+    addStepLink.href = '#';
+    addStepLink.textContent = '+ Add another step';
+    addStepLink.style.cssText = 'color:#3b82f6;font-size:11px;text-decoration:none;';
+    addStepLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      var currentCount = stepsContainer.querySelectorAll('[data-step-index]').length;
+      if (currentCount >= maxSteps) return;
+      var newStep = _buildStepUI(currentCount, stepsContainer, [], maxSteps);
+      stepsContainer.appendChild(newStep);
+      // Update add-step visibility
+      if (currentCount + 1 >= maxSteps) {
+        addStepLink.style.display = 'none';
+        dashboardLink.style.display = 'inline';
+      }
+    });
+    addStepRow.appendChild(addStepLink);
+
+    var dashboardLink = document.createElement('a');
+    dashboardLink.href = serverUrl + '/templates/new';
+    dashboardLink.target = '_blank';
+    dashboardLink.rel = 'noopener';
+    dashboardLink.textContent = 'Create full template in dashboard \u2192';
+    dashboardLink.style.cssText = 'color:#3b82f6;font-size:11px;text-decoration:none;display:none;margin-left:8px;';
+    addStepRow.appendChild(dashboardLink);
+
+    builder.appendChild(addStepRow);
+
+    // Button row
     var btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:6px;';
+
     var saveBtn = document.createElement('button');
     saveBtn.type = 'button';
     saveBtn.textContent = 'Set';
-    saveBtn.style.cssText = 'background:#22c55e;color:white;border:none;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;';
+    saveBtn.style.cssText = 'background:#3b82f6;color:white;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;';
     saveBtn.addEventListener('click', function() {
-      var stopOn = [];
-      if (replyCheck.checked) stopOn.push('reply');
-      var steps = JSON.stringify([{
-        delayDays: parseInt(delayInput.value) || 2,
-        subject: subInput.value || 'Re: {{subject}}',
-        body: bodyInput.value || '',
-        stopOn: stopOn,
-      }]);
+      var stepEls = stepsContainer.querySelectorAll('[data-step-index]');
+      var steps = [];
+      stepEls.forEach(function(stepEl) {
+        var stopOn = [];
+        if (stepEl._replyCheck && stepEl._replyCheck.checked) stopOn.push('reply');
+        if (stepEl._openCheck && stepEl._openCheck.checked) stopOn.push('open');
+        steps.push({
+          delayDays: parseInt(stepEl._delayInput.value) || 2,
+          subject: stepEl._subInput.value || 'Re: {{subject}}',
+          body: stepEl._bodyTextarea.value || '',
+          stopOn: stopOn,
+        });
+      });
       btn.setAttribute('data-selected-template', '');
-      btn.setAttribute('data-oneoff-steps', steps);
-      labelSpan.textContent = 'One-off (' + (delayInput.value || '2') + 'd)';
+      btn.setAttribute('data-oneoff-steps', JSON.stringify(steps));
+      setSequenceBtnState(btn, svgEl, true, 'One-off follow-up');
       builder.remove();
     });
     btnRow.appendChild(saveBtn);
@@ -722,7 +966,7 @@
     var cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.cssText = 'background:#3f3f46;color:#a1a1aa;border:1px solid #52525b;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;';
+    cancelBtn.style.cssText = 'background:white;color:#6b7280;border:1px solid #d1d5db;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11px;';
     cancelBtn.addEventListener('click', function() { builder.remove(); });
     btnRow.appendChild(cancelBtn);
     builder.appendChild(btnRow);
