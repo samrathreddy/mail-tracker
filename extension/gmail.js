@@ -527,11 +527,12 @@
 
   function setSequenceBtnState(btn, svgEl, selected, tooltipText) {
     if (selected) {
-      btn.style.background = 'rgba(59,130,246,0.1)';
-      svgEl.style.color = '#3b82f6';
+      btn.style.background = 'rgba(59,130,246,0.12)';
+      btn.style.borderRadius = '50%';
+      svgEl.setAttribute('stroke', '#2563eb');
     } else {
       btn.style.background = 'transparent';
-      svgEl.style.color = '#5f6368';
+      svgEl.setAttribute('stroke', '#3b82f6');
     }
     btn.title = tooltipText;
   }
@@ -557,36 +558,43 @@
 
     var svgNS = 'http://www.w3.org/2000/svg';
     var svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('width', '16');
-    svg.setAttribute('height', '16');
-    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('width', '18');
+    svg.setAttribute('height', '18');
+    svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('fill', 'none');
-    svg.style.color = '#94a3b8';
+    svg.setAttribute('stroke', '#3b82f6');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
 
-    // Three connected dots forming a vertical timeline
-    var c1 = document.createElementNS(svgNS, 'circle');
-    c1.setAttribute('cx', '8'); c1.setAttribute('cy', '3'); c1.setAttribute('r', '2');
-    c1.setAttribute('fill', 'currentColor');
-    var c2 = document.createElementNS(svgNS, 'circle');
-    c2.setAttribute('cx', '8'); c2.setAttribute('cy', '8'); c2.setAttribute('r', '2');
-    c2.setAttribute('fill', 'currentColor');
-    var c3 = document.createElementNS(svgNS, 'circle');
-    c3.setAttribute('cx', '8'); c3.setAttribute('cy', '13'); c3.setAttribute('r', '2');
-    c3.setAttribute('fill', 'currentColor');
-    var line1 = document.createElementNS(svgNS, 'line');
-    line1.setAttribute('x1', '8'); line1.setAttribute('y1', '5');
-    line1.setAttribute('x2', '8'); line1.setAttribute('y2', '6');
-    line1.setAttribute('stroke', 'currentColor'); line1.setAttribute('stroke-width', '1.5');
-    var line2 = document.createElementNS(svgNS, 'line');
-    line2.setAttribute('x1', '8'); line2.setAttribute('y1', '10');
-    line2.setAttribute('x2', '8'); line2.setAttribute('y2', '11');
-    line2.setAttribute('stroke', 'currentColor'); line2.setAttribute('stroke-width', '1.5');
+    // Paper airplane (send) icon
+    var plane = document.createElementNS(svgNS, 'path');
+    plane.setAttribute('d', 'M22 2L11 13');
+    svg.appendChild(plane);
+    var plane2 = document.createElementNS(svgNS, 'path');
+    plane2.setAttribute('d', 'M22 2L15 22L11 13L2 9L22 2Z');
+    svg.appendChild(plane2);
 
-    svg.appendChild(c1);
-    svg.appendChild(line1);
-    svg.appendChild(c2);
-    svg.appendChild(line2);
-    svg.appendChild(c3);
+    // Small clock in bottom-right corner
+    var clockCircle = document.createElementNS(svgNS, 'circle');
+    clockCircle.setAttribute('cx', '19');
+    clockCircle.setAttribute('cy', '19');
+    clockCircle.setAttribute('r', '4.5');
+    clockCircle.setAttribute('fill', 'white');
+    clockCircle.setAttribute('stroke', '#3b82f6');
+    clockCircle.setAttribute('stroke-width', '1.5');
+    svg.appendChild(clockCircle);
+    var clockHand1 = document.createElementNS(svgNS, 'line');
+    clockHand1.setAttribute('x1', '19'); clockHand1.setAttribute('y1', '17');
+    clockHand1.setAttribute('x2', '19'); clockHand1.setAttribute('y2', '19');
+    clockHand1.setAttribute('stroke', '#3b82f6'); clockHand1.setAttribute('stroke-width', '1.5');
+    svg.appendChild(clockHand1);
+    var clockHand2 = document.createElementNS(svgNS, 'line');
+    clockHand2.setAttribute('x1', '19'); clockHand2.setAttribute('y1', '19');
+    clockHand2.setAttribute('x2', '20.5'); clockHand2.setAttribute('y2', '20');
+    clockHand2.setAttribute('stroke', '#3b82f6'); clockHand2.setAttribute('stroke-width', '1.5');
+    svg.appendChild(clockHand2);
+
     btn.appendChild(svg);
 
     const dropdown = document.createElement('div');
