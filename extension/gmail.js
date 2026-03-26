@@ -180,6 +180,9 @@
 
   function computeNextBusinessSendAt(optimalHour, recipientTz) {
     var tz = recipientTz || 'America/New_York';
+    // Clamp optimal hour to 8am-6pm business window
+    var clampedHour = optimalHour;
+    if (clampedHour < 8 || clampedHour >= 18) clampedHour = 9;
     var now = Date.now();
     for (var t = now + 60000; t < now + 21 * 86400000; t += 60000) {
       var d = new Date(t);
@@ -190,7 +193,7 @@
       var mp = parts.find(function(p) { return p.type === 'minute'; });
       var h = hp ? parseInt(hp.value, 10) : 0;
       var m = mp ? parseInt(mp.value, 10) : 0;
-      if (h === optimalHour && m === 0) return d.toISOString();
+      if (h === clampedHour && m === 0) return d.toISOString();
     }
     return new Date(now + 3600000).toISOString();
   }
@@ -417,14 +420,15 @@
     console.log(LOG, 'Found untracked recipients:', untracked);
     await injectTracker(bodyEl, untracked);
 
-    // Create sequence if one was selected
+    // Create sequence if one was selected (but NOT if a scheduled send is pending)
     // Search within form first, then the whole compose dialog (button may be in toolbar)
     const seqBtn = form.querySelector('[data-sequence-selector] button') ||
                    (form.closest('[role="dialog"]') || document).querySelector('[data-sequence-selector] button');
     if (seqBtn) {
       const templateId = seqBtn.getAttribute('data-selected-template');
       const oneoffSteps = seqBtn.getAttribute('data-oneoff-steps');
-      if (templateId || oneoffSteps) {
+      var isScheduled = seqBtn.getAttribute('data-scheduled-at');
+      if (!isScheduled && (templateId || oneoffSteps)) {
         const { subject, bodyPreview } = getEmailContent(form);
         const allRecipients = getRecipients(form);
         const bccAddresses = getBccLoggingAddresses(form);
@@ -519,6 +523,8 @@
       timezoneSource: tzSource || null,
       trackerId: trackerId,
       sequenceId: null,
+      threadId: null,
+      inReplyTo: null,
     };
     try {
       var res = await fetch(serverUrl + '/scheduled', { method: 'POST', headers: authHeadersJson(), body: JSON.stringify(payload) });
@@ -614,55 +620,72 @@
   // Add read indicators to sent emails in inbox view
   async function addInboxReadIndicators() {
     if (!serverUrl || !dashboardPassword) return;
-    
+
     console.log(LOG, 'addInboxReadIndicators called');
-    
-    // First, remove all existing indicators to prevent duplicates
-    document.querySelectorAll('.mail-tracker-status, [data-thread-intel]').forEach(el => el.remove());
-    console.log(LOG, 'Cleared existing indicators');
-    
+
     // Fetch tracking data ONCE before processing emails
     const trackers = await getTrackingData();
     console.log(LOG, 'Got', trackers.length, 'trackers for processing');
-    
+
     // Find sent email rows (emails with "To: " prefix)
     const sentRows = document.querySelectorAll('tr[role="row"]');
     console.log(LOG, 'Found', sentRows.length, 'email rows');
-    
-    sentRows.forEach((row, index) => {
+
+    sentRows.forEach((row, _index) => {
       const toField = row.querySelector('.yW');
       if (!toField || !toField.textContent.startsWith('To: ')) return;
-      
+
       const emailSpan = toField.querySelector('span[email]');
-      if (!emailSpan) return; // Remove the duplicate check since we cleared all indicators above
-      
+      if (!emailSpan) return;
+
       const email = emailSpan.getAttribute('email');
-      console.log(LOG, 'Processing row', index, 'for email:', email);
-      
+
       // Get email identifiers for better matching
       const identifiers = getEmailIdentifiers(row);
-      console.log(LOG, 'Email identifiers:', identifiers);
-      
+
       // Find the best matching tracker for this specific email
       const tracker = findMatchingTracker(trackers, email, identifiers);
-      
+
       // Only add indicator if email was tracked
-      if (!tracker) {
-        console.log(LOG, 'Email', email, 'not tracked, skipping');
+      if (!tracker) return;
+
+      // Check if this row already has an indicator
+      const existingStatus = row.querySelector('.mail-tracker-status');
+      if (existingStatus) {
+        // Compare opens count to see if we need to update
+        var currentOpens = parseInt(existingStatus.getAttribute('data-tracker-opens') || '0', 10);
+        if (currentOpens === tracker.opens) return; // No change, skip
+
+        // Update existing indicator in-place
+        existingStatus.setAttribute('data-tracker-opens', String(tracker.opens));
+        if (tracker.opens > 0) {
+          existingStatus.textContent = '\u2713\u2713';
+          existingStatus.style.color = '#1a73e8';
+          var lastOpen = tracker.lastOpen ? new Date(tracker.lastOpen).toLocaleString('en-US', {
+            hour: 'numeric', minute: '2-digit', hour12: true, month: 'short', day: 'numeric'
+          }) : 'never';
+          existingStatus.title = 'Opened ' + tracker.opens + ' time' + (tracker.opens > 1 ? 's' : '') + '\nLast opened: ' + lastOpen;
+        } else {
+          existingStatus.textContent = '\u2713';
+          existingStatus.style.color = '#5f6368';
+          existingStatus.title = 'Sent but not opened yet';
+        }
+        console.log(LOG, 'Updated indicator for:', email);
         return;
       }
-      
+
       console.log(LOG, 'Found tracked email to:', email);
-      
+
       // Create status indicator
       const statusEl = document.createElement('span');
       statusEl.className = 'mail-tracker-status';
       statusEl.style.cssText = 'margin-left: 6px; font-size: 11px; color: #5f6368; cursor: help; font-weight: bold;';
-      
+      statusEl.setAttribute('data-tracker-opens', String(tracker.opens));
+
       if (tracker.opens > 0) {
-        statusEl.textContent = '✓✓'; // Double tick for read
+        statusEl.textContent = '\u2713\u2713'; // Double tick for read
         statusEl.style.color = '#1a73e8'; // Blue for read
-        
+
         const lastOpen = tracker.lastOpen ? new Date(tracker.lastOpen).toLocaleString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
@@ -670,13 +693,13 @@
           month: 'short',
           day: 'numeric'
         }) : 'never';
-        
+
         statusEl.title = `Opened ${tracker.opens} time${tracker.opens > 1 ? 's' : ''}\nLast opened: ${lastOpen}`;
       } else {
-        statusEl.textContent = '✓'; // Single tick for sent
+        statusEl.textContent = '\u2713'; // Single tick for sent
         statusEl.title = 'Sent but not opened yet';
       }
-      
+
       // Insert after email span
       emailSpan.parentNode.insertBefore(statusEl, emailSpan.nextSibling);
 
@@ -700,15 +723,24 @@
     });
   }
 
+  var lastThreadIntelRun = 0;
+
   async function injectThreadIntelligence() {
+    var now = Date.now();
+    if (now - lastThreadIntelRun < 5000) return;
+    lastThreadIntelRun = now;
     if (!serverUrl || !dashboardPassword) return;
+    // Only run in sent folder or when viewing a thread
+    if (!location.hash.startsWith('#sent') && !document.querySelector('div[role="list"]')) return;
     var trackers = await getTrackingData();
     document.querySelectorAll('div[role="listitem"] span[email]').forEach(function(span) {
       var email = span.getAttribute('email');
       if (!email) return;
       var host = span.closest('div[role="listitem"]');
       if (!host || host.querySelector('[data-thread-intel]')) return;
-      var tracker = trackers.find(function(t) { return t.recipient === email; });
+      var matches = trackers.filter(function(t) { return t.recipient === email; });
+      matches.sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
+      var tracker = matches[0] || null;
       if (!tracker) return;
       var intelBtn = document.createElement('button');
       intelBtn.type = 'button';
@@ -1115,7 +1147,7 @@
   function expandThreadIntelCard(panel, trackerId, trackerSummary, recipientInfo, seqData) {
     var anchor = panel._anchorEl;
     panel.style.width = '400px';
-    panel.innerHTML = '';
+    while (panel.firstChild) panel.removeChild(panel.firstChild);
     panel._anchorEl = anchor;
 
     var title = document.createElement('div');
@@ -1145,7 +1177,7 @@
     panel.appendChild(scroll);
 
     fetchTrackerJson(trackerId).then(function(full) {
-      scroll.innerHTML = '';
+      while (scroll.firstChild) scroll.removeChild(scroll.firstChild);
       if (!full || !full.events || full.events.length === 0) {
         var empty = document.createElement('div');
         empty.textContent = 'No open events yet.';
@@ -1290,13 +1322,30 @@
       seqBadge.textContent = (found.status || 'active') + ' · step ' + (found.currentStep + 1) + '/' + (found.steps ? found.steps.length : '?');
     });
 
+    if (recipientInfo && (recipientInfo.firstName || recipientInfo.lastName)) {
+      var nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:4px;';
+      nameEl.textContent = [recipientInfo.firstName, recipientInfo.lastName].filter(Boolean).join(' ');
+      panel.appendChild(nameEl);
+    }
+
     var rec = document.createElement('div');
     rec.style.cssText = 'font-size:12px;color:#374151;margin-bottom:8px;';
-    rec.textContent = recipientInfo ? [recipientInfo.company, recipientInfo.jobTitle].filter(Boolean).join(' · ') : 'Loading recipient…';
+    rec.textContent = recipientInfo ? [recipientInfo.company, recipientInfo.jobTitle].filter(Boolean).join(' \u00b7 ') : 'Loading recipient\u2026';
     panel.appendChild(rec);
 
     fetchRecipientInfoExt(trackerSummary.recipient).then(function(ri) {
-      if (ri) rec.textContent = [ri.company, ri.jobTitle].filter(Boolean).join(' · ') || '—';
+      if (ri) {
+        rec.textContent = [ri.company, ri.jobTitle].filter(Boolean).join(' \u00b7 ') || '\u2014';
+        // Update name if not already shown
+        if ((ri.firstName || ri.lastName) && !panel.querySelector('[data-recipient-name]')) {
+          var nameEl2 = document.createElement('div');
+          nameEl2.setAttribute('data-recipient-name', 'true');
+          nameEl2.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:4px;';
+          nameEl2.textContent = [ri.firstName, ri.lastName].filter(Boolean).join(' ');
+          rec.parentNode.insertBefore(nameEl2, rec);
+        }
+      }
     });
 
     var expand = document.createElement('button');
@@ -1460,7 +1509,7 @@
       pickPanel.appendChild(tzLab);
       var tzSel = document.createElement('select');
       tzSel.style.cssText = 'width:100%;font-size:12px;padding:4px;border-radius:6px;margin-bottom:8px;background:#18181b;color:#e4e4e7;border:1px solid #52525b;';
-      var zones = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Australia/Sydney'];
+      var zones = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Sao_Paulo', 'America/Mexico_City', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Africa/Johannesburg', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney', 'Pacific/Auckland'];
       var userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
       zones.forEach(function(z) {
         var o = document.createElement('option');
@@ -1487,16 +1536,50 @@
           showToast('Pick a date and time');
           return;
         }
-        var d = new Date(pickLocal.value);
-        if (isNaN(d.getTime())) {
+        // Parse the datetime-local value as components
+        var parts = pickLocal.value.split('T');
+        var dateParts = parts[0].split('-');
+        var timeParts = parts[1].split(':');
+        var year = parseInt(dateParts[0]);
+        var month = parseInt(dateParts[1]) - 1;
+        var day = parseInt(dateParts[2]);
+        var hour = parseInt(timeParts[0]);
+        var minute = parseInt(timeParts[1]) || 0;
+        var selectedTz = tzSel.value;
+
+        if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour)) {
           showToast('Invalid date/time');
           return;
         }
-        btn.setAttribute('data-scheduled-at', d.toISOString());
-        btn.setAttribute('data-recipient-timezone', tzSel.value);
+
+        // Create a date in the selected timezone by finding the UTC offset
+        var formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: selectedTz,
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        });
+
+        // Start with a rough UTC estimate
+        var rough = new Date(Date.UTC(year, month, day, hour, minute));
+        // Check what local time this produces in the target TZ
+        var localParts = formatter.formatToParts(rough);
+        var localHour = parseInt(localParts.find(function(p) { return p.type === 'hour'; }).value);
+        var localMinute = parseInt(localParts.find(function(p) { return p.type === 'minute'; }).value);
+        var localDay = parseInt(localParts.find(function(p) { return p.type === 'day'; }).value);
+
+        // Compute the offset and adjust
+        var hourDiff = localHour - hour;
+        var minuteDiff = localMinute - minute;
+        var dayDiff = localDay - day;
+        var adjustMs = (hourDiff * 3600000) + (minuteDiff * 60000) + (dayDiff * 86400000);
+        var corrected = new Date(rough.getTime() - adjustMs);
+
+        btn.setAttribute('data-scheduled-at', corrected.toISOString());
+        btn.setAttribute('data-scheduled-tz', selectedTz);
+        btn.setAttribute('data-recipient-timezone', selectedTz);
         btn.setAttribute('data-timezone-source', 'manual');
         dropdown.style.display = 'none';
-        showToast('Click Send to schedule for ' + formatScheduleLabel(d.toISOString(), tzSel.value));
+        showToast('Click Send to schedule for ' + formatScheduleLabel(corrected.toISOString(), selectedTz));
       });
       pickPanel.appendChild(pickConfirm);
       dropdown.appendChild(pickPanel);
@@ -1520,24 +1603,28 @@
             else if (src === 'tld' || src === 'open_history') dotOpt.style.background = '#eab308';
             else dotOpt.style.background = '#9ca3af';
             optLabel.textContent = 'Optimize for recipient — ' + formatScheduleLabel(iso, tz);
-            optimizeRow._iso = iso;
-            optimizeRow._tz = tz;
-            optimizeRow._info = info;
+            optimizeRow.setAttribute('data-sched-iso', iso);
+            optimizeRow.setAttribute('data-sched-tz', tz);
+            optimizeRow.setAttribute('data-sched-info', JSON.stringify(info));
           })
           .catch(function() {});
       }
 
       optimizeRow.addEventListener('click', function(ev) {
         ev.stopPropagation();
-        if (!optimizeRow._iso) {
-          showToast('Recipient timezone not loaded yet — try again');
+        var schedIso = optimizeRow.getAttribute('data-sched-iso');
+        if (!schedIso) {
+          showToast('Recipient timezone not loaded yet \u2014 try again');
           return;
         }
-        btn.setAttribute('data-scheduled-at', optimizeRow._iso);
-        btn.setAttribute('data-recipient-timezone', optimizeRow._tz || '');
-        btn.setAttribute('data-timezone-source', optimizeRow._info && optimizeRow._info.timezoneSource ? optimizeRow._info.timezoneSource : '');
+        var schedTz = optimizeRow.getAttribute('data-sched-tz') || '';
+        var schedInfoStr = optimizeRow.getAttribute('data-sched-info');
+        var schedInfo = schedInfoStr ? JSON.parse(schedInfoStr) : null;
+        btn.setAttribute('data-scheduled-at', schedIso);
+        btn.setAttribute('data-recipient-timezone', schedTz);
+        btn.setAttribute('data-timezone-source', schedInfo && schedInfo.timezoneSource ? schedInfo.timezoneSource : '');
         dropdown.style.display = 'none';
-        showToast('Click Send to schedule for ' + formatScheduleLabel(optimizeRow._iso, optimizeRow._tz));
+        showToast('Click Send to schedule for ' + formatScheduleLabel(schedIso, schedTz));
       });
 
       const sendNowRow = document.createElement('div');

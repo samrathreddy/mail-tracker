@@ -686,6 +686,15 @@ export default {
       if (!body.to || !body.subject || !body.body || !body.scheduledAt) {
         return json({ error: 'to, subject, body, and scheduledAt are required' }, 400);
       }
+      if (!body.to.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return json({ error: 'Invalid email format' }, 400);
+      if (body.body.length > 500000) return json({ error: 'Email body too large (max 500KB)' }, 400);
+      const scheduledDate = new Date(body.scheduledAt);
+      if (isNaN(scheduledDate.getTime())) {
+        return json({ error: 'scheduledAt must be a valid ISO-8601 date' }, 400);
+      }
+      if (scheduledDate.getTime() < Date.now()) {
+        return json({ error: 'scheduledAt must be in the future' }, 400);
+      }
       const id = `sched:${crypto.randomUUID().slice(0, 8)}`;
       const scheduled = {
         id, to: body.to, cc: body.cc || '', bcc: body.bcc || '',
@@ -695,6 +704,8 @@ export default {
         timezoneSource: body.timezoneSource || null,
         trackerId: body.trackerId || null,
         sequenceId: body.sequenceId || null,
+        threadId: body.threadId || null,
+        inReplyTo: body.inReplyTo || null,
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
@@ -706,8 +717,10 @@ export default {
       if (!checkAuth(request, env)) return requireAuthCors();
       if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
       const keys = await env.SEQUENCES.list({ prefix: 'sched:' });
-      const items = await Promise.all(keys.keys.map(k => env.SEQUENCES.get(k.name, 'json')));
-      return json(items.filter(Boolean));
+      const statusFilter = url.searchParams.get('status');
+      let items = (await Promise.all(keys.keys.map(k => env.SEQUENCES.get(k.name, 'json')))).filter(Boolean);
+      if (statusFilter) items = items.filter(i => i.status === statusFilter);
+      return json(items);
     }
 
     if (url.pathname.match(/^\/scheduled\/sched:[a-f0-9]+$/) && request.method === 'DELETE') {

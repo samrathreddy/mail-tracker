@@ -319,7 +319,13 @@ async function sendDueScheduledEmails(env) {
     });
 
     if (result.error) {
-      console.error('Scheduled email send failed:', result.error);
+      scheduled.retryCount = (scheduled.retryCount || 0) + 1;
+      scheduled.lastError = String(result.error).slice(0, 200);
+      if (scheduled.retryCount >= 5) {
+        scheduled.status = 'failed';
+        scheduled.failedAt = new Date().toISOString();
+      }
+      await env.SEQUENCES.put(key.name, JSON.stringify(scheduled));
       continue;
     }
 

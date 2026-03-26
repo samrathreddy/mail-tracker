@@ -88,6 +88,21 @@ function extractTldFromEmail(email) {
   return null;
 }
 
+const HUBSPOT_TZ_ALIASES = {
+  'US/Eastern': 'America/New_York',
+  'US/Central': 'America/Chicago',
+  'US/Mountain': 'America/Denver',
+  'US/Pacific': 'America/Los_Angeles',
+  'US/Hawaii': 'Pacific/Honolulu',
+  'US/Alaska': 'America/Anchorage',
+  'Eastern Standard Time': 'America/New_York',
+  'Central Standard Time': 'America/Chicago',
+  'Mountain Standard Time': 'America/Denver',
+  'Pacific Standard Time': 'America/Los_Angeles',
+  'GMT': 'Etc/GMT',
+  'UTC': 'UTC',
+};
+
 function isValidIanaTimezone(tz) {
   if (!tz || typeof tz !== 'string') return false;
   try {
@@ -148,7 +163,8 @@ export async function lookupRecipient(env, email) {
     const data = await res.json();
     const props = data.properties || {};
 
-    const tz = props.hs_timezone || props.hs_time_zone || '';
+    let tz = props.hs_timezone || props.hs_time_zone || '';
+    tz = HUBSPOT_TZ_ALIASES[tz] || tz;
     const timezone = tz && isValidIanaTimezone(tz) ? tz : null;
 
     return {
@@ -208,9 +224,13 @@ async function loadAllTrackers(env) {
   if (!env.TRACKER) return [];
   const keys = await listAllKeys(env.TRACKER, null);
   const trackers = [];
-  for (const k of keys) {
-    const data = await env.TRACKER.get(k.name, 'json');
-    if (data) trackers.push({ ...data, _id: k.name });
+  const BATCH = 50;
+  for (let i = 0; i < keys.length; i += BATCH) {
+    const batch = keys.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(k => env.TRACKER.get(k.name, 'json')));
+    for (let j = 0; j < results.length; j++) {
+      if (results[j]) trackers.push({ ...results[j], _id: batch[j].name });
+    }
   }
   return trackers;
 }
@@ -218,14 +238,14 @@ async function loadAllTrackers(env) {
 /**
  * Cascading open-time analysis for optimal hour in recipient timezone.
  */
-export async function getOptimalSendTime(env, email, timezone) {
+export async function getOptimalSendTime(env, email, timezone, preloadedTrackers) {
   const tz = isValidIanaTimezone(timezone) ? timezone : 'America/New_York';
 
   if (!env.TRACKER) {
     return { hour: 9, confidence: 'default', source: 'default', sampleSize: 0 };
   }
 
-  const trackers = await loadAllTrackers(env);
+  const trackers = preloadedTrackers || await loadAllTrackers(env);
   const norm = normalizeEmail(email);
   const domain = norm.includes('@') ? norm.split('@')[1] : '';
 
@@ -334,7 +354,7 @@ export async function getRecipientInfo(env, email, defaultTimezone) {
     timezoneSource = 'tld';
   }
 
-  const optimalSendTime = await getOptimalSendTime(env, addr, timezone);
+  const optimalSendTime = await getOptimalSendTime(env, addr, timezone, trackers);
 
   const result = {
     email: addr,
