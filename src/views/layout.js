@@ -185,11 +185,14 @@ export function renderLayout(opts) {
       font-size: 13px;
       font-weight: 600;
       opacity: 0;
-      transition: opacity 0.15s;
+      width: 0;
+      overflow: hidden;
+      transition: opacity 0.15s, width 0.2s;
       white-space: nowrap;
     }
     nav.sidebar:hover .sidebar-logo-text {
       opacity: 1;
+      width: auto;
     }
 
     .nav-item {
@@ -237,14 +240,19 @@ export function renderLayout(opts) {
     .nav-label {
       font-size: 12px;
       opacity: 0;
-      transition: opacity 0.15s;
+      width: 0;
+      overflow: hidden;
+      transition: opacity 0.15s, width 0.2s;
     }
     nav.sidebar:hover .nav-label {
       opacity: 1;
+      width: auto;
     }
 
     .nav-badge {
       margin-left: auto;
+      width: 0;
+      overflow: hidden;
       background: #2d3450;
       color: #60a5fa;
       padding: 1px 8px;
@@ -255,6 +263,7 @@ export function renderLayout(opts) {
     }
     nav.sidebar:hover .nav-badge {
       opacity: 1;
+      width: auto;
     }
 
     .sidebar-separator {
@@ -301,11 +310,14 @@ export function renderLayout(opts) {
       color: #8896b3;
       font-size: 11px;
       opacity: 0;
-      transition: opacity 0.15s;
+      width: 0;
+      overflow: hidden;
+      transition: opacity 0.15s, width 0.2s;
       white-space: nowrap;
     }
     nav.sidebar:hover .sidebar-status-text {
       opacity: 1;
+      width: auto;
     }
 
     main.page-main {
