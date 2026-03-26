@@ -48,9 +48,13 @@ export function substituteVariables(text, context) {
     ? Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000)
     : 0;
 
+  const derivedFirstName = deriveFirstName(recipient);
+  const derivedCompany = deriveCompany(recipient);
+
   const builtIns = {
-    firstName: deriveFirstName(recipient),
-    company: deriveCompany(recipient),
+    firstName: derivedFirstName,
+    first_name: derivedFirstName,
+    company: derivedCompany,
     recipient: recipient || '',
     subject: subject || '',
     originalBody: originalBody || '',

@@ -850,23 +850,26 @@ function buildClientScripts(template) {
     var isSaving = false;
 
     var VARIABLES = [
-      { name: 'firstName', desc: "Recipient's first name" },
+      { name: 'first_name', desc: "Recipient's first name" },
       { name: 'company', desc: "Recipient's company name" },
       { name: 'recipient', desc: 'Full email address' },
       { name: 'subject', desc: 'Original email subject' },
       { name: 'originalBody', desc: 'Body preview' },
-      { name: 'daysSince', desc: 'Days since original email' },
+      { name: 'daysSince', desc: 'Days since previous step' },
       { name: 'stepNumber', desc: 'Current step number' }
     ];
 
     var SAMPLE_DATA = {
       firstName: 'Alice',
+      first_name: 'Alice',
       company: 'Acme',
       recipient: 'alice@acme.com',
       subject: 'Partnership proposal',
       originalBody: 'Hi, I wanted to discuss a potential partnership...',
       daysSince: '3',
-      stepNumber: '1'
+      stepNumber: '1',
+      sender_first_name: 'You',
+      senderFirstName: 'You'
     };
 
     // Set timezone selector to match template
@@ -1489,8 +1492,15 @@ function buildClientScripts(template) {
     }
 
     function replaceVars(text) {
-      return text.replace(/\\{\\{(\\w+)\\}\\}/g, function(_m, name) {
-        return SAMPLE_DATA[name] || ('{{' + name + '}}');
+      return text.replace(/\\{\\{([^}]+)\\}\\}/g, function(match, inner) {
+        // Spintax: contains pipe → pick random option
+        if (inner.indexOf('|') !== -1) {
+          var opts = inner.split('|');
+          return opts[Math.floor(Math.random() * opts.length)].trim();
+        }
+        // Variable lookup
+        var name = inner.trim();
+        return SAMPLE_DATA[name] || match;
       });
     }
 
