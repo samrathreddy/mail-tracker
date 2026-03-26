@@ -246,7 +246,7 @@ export function renderTemplatesPage(templates, oauthConnected) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var id = btn.getAttribute('data-dup');
-        fetch('/templates/' + encodeURIComponent(id), {
+        fetch('/templates/' + id, {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         })
@@ -266,7 +266,7 @@ export function renderTemplatesPage(templates, oauthConnected) {
         .then(function(res) { return res.json(); })
         .then(function(created) {
           if (created && created.id) {
-            window.location.href = '/templates/' + encodeURIComponent(created.id) + '/edit';
+            window.location.href = '/templates/' + created.id + '/edit';
           } else {
             location.reload();
           }
@@ -283,8 +283,11 @@ export function renderTemplatesPage(templates, oauthConnected) {
         e.stopPropagation();
         var id = btn.getAttribute('data-del');
         if (!confirm('Delete this template? This cannot be undone.')) return;
-        fetch('/templates/' + encodeURIComponent(id), { method: 'DELETE' })
-          .then(function() { location.reload(); })
+        fetch('/templates/' + id, { method: 'DELETE' })
+          .then(function(res) {
+            if (!res.ok) throw new Error('Server returned ' + res.status);
+            location.reload();
+          })
           .catch(function(err) {
             alert('Failed to delete template: ' + err.message);
           });
