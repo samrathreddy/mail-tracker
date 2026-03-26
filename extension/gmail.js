@@ -129,6 +129,84 @@
     return Array.from(allEmails).filter(isBccLoggingAddress);
   }
 
+  function authHeadersJson() {
+    var headers = { 'Content-Type': 'application/json' };
+    if (dashboardPassword) headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+    return headers;
+  }
+
+  function showToast(message) {
+    var el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100000;background:#1f2937;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-family:Roboto,Google Sans,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.35);max-width:90vw;';
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(function() { el.remove(); }, 4200);
+  }
+
+  function getComposeParticipants(composeForm) {
+    var out = { to: [], cc: [], bcc: [] };
+    composeForm.querySelectorAll('tr, [role="listitem"]').forEach(function(row) {
+      var labelText = '';
+      var lx = row.querySelector('.aXa, .aYk');
+      if (lx) labelText = (lx.textContent || '').trim();
+      if (!labelText && row.getAttribute('aria-label')) labelText = row.getAttribute('aria-label') || '';
+      var lt = labelText.trim().toLowerCase();
+      var emails = [];
+      row.querySelectorAll('span[email]').forEach(function(el) {
+        var e = el.getAttribute('email');
+        if (e && e.indexOf('@') !== -1) emails.push(e.toLowerCase());
+      });
+      if (emails.length === 0) return;
+      if (lt.indexOf('to') === 0 || lt === 'to') out.to = emails;
+      else if (lt.indexOf('cc') === 0) out.cc = emails;
+      else if (lt.indexOf('bcc') === 0) out.bcc = emails;
+    });
+    if (out.to.length === 0) out.to = getRecipients(composeForm);
+    return out;
+  }
+
+  function getComposeBodyHtml(composeForm) {
+    var bodyEl = composeForm.querySelector('[contenteditable="true"][aria-label*="Message"]') ||
+      composeForm.querySelector('[contenteditable="true"][role="textbox"]') ||
+      composeForm.querySelector('[contenteditable="true"]');
+    return bodyEl ? bodyEl.innerHTML : '';
+  }
+
+  function getComposeSubjectLine(composeForm) {
+    var subjectEl = composeForm.querySelector('input[name="subjectbox"]') ||
+      composeForm.querySelector('input[aria-label*="Subject"]');
+    return subjectEl ? String(subjectEl.value || '').trim() : '';
+  }
+
+  function computeNextBusinessSendAt(optimalHour, recipientTz) {
+    var tz = recipientTz || 'America/New_York';
+    var now = Date.now();
+    for (var t = now + 60000; t < now + 21 * 86400000; t += 60000) {
+      var d = new Date(t);
+      var wd = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(d);
+      if (wd === 'Sat' || wd === 'Sun') continue;
+      var parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(d);
+      var hp = parts.find(function(p) { return p.type === 'hour'; });
+      var mp = parts.find(function(p) { return p.type === 'minute'; });
+      var h = hp ? parseInt(hp.value, 10) : 0;
+      var m = mp ? parseInt(mp.value, 10) : 0;
+      if (h === optimalHour && m === 0) return d.toISOString();
+    }
+    return new Date(now + 3600000).toISOString();
+  }
+
+  function formatScheduleLabel(iso, recipientTz) {
+    var tz = recipientTz || 'America/New_York';
+    var d = new Date(iso);
+    return d.toLocaleString('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  }
+
+  function discardComposeWindow(composeForm) {
+    var discard = composeForm.querySelector('[aria-label*="Discard"]') ||
+      composeForm.querySelector('[data-tooltip*="Discard"]');
+    if (discard) discard.click();
+  }
+
   // Extract email subject and body preview
   function getEmailContent(composeForm) {
     // Try multiple selectors for subject
@@ -406,7 +484,60 @@
 
   // Watch for Send button clicks — block send, inject pixels, then allow send
   let isSending = false; // Flag to prevent infinite loop
-  
+
+  function authHeadersBasicOnly() {
+    var h = {};
+    if (dashboardPassword) h['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+    return h;
+  }
+
+  async function handleScheduledSend(bodyEl, form, seqBtn) {
+    var scheduledAt = seqBtn.getAttribute('data-scheduled-at');
+    if (!scheduledAt || !serverUrl) return false;
+    var p = getComposeParticipants(form);
+    var to = p.to.join(', ') || (getRecipients(form)[0] || '');
+    var cc = p.cc.join(', ');
+    var bccList = p.bcc.slice();
+    getBccLoggingAddresses(form).forEach(function(b) {
+      if (bccList.indexOf(b) === -1) bccList.push(b);
+    });
+    var bcc = bccList.join(', ');
+    var subject = getComposeSubjectLine(form);
+    var bodyHtml = getComposeBodyHtml(form);
+    var img = bodyEl.querySelector('img[data-mail-tracker]');
+    var trackerId = img ? new URL(img.src).pathname.split('/t/')[1] : null;
+    var recipientTz = seqBtn.getAttribute('data-recipient-timezone') || '';
+    var tzSource = seqBtn.getAttribute('data-timezone-source') || '';
+    var payload = {
+      to: to,
+      cc: cc,
+      bcc: bcc,
+      subject: subject,
+      body: bodyHtml,
+      scheduledAt: scheduledAt,
+      recipientTimezone: recipientTz || null,
+      timezoneSource: tzSource || null,
+      trackerId: trackerId,
+      sequenceId: null,
+    };
+    try {
+      var res = await fetch(serverUrl + '/scheduled', { method: 'POST', headers: authHeadersJson(), body: JSON.stringify(payload) });
+      if (!res.ok) {
+        showToast('Schedule failed (' + res.status + ')');
+        return true;
+      }
+    } catch (_err) {
+      showToast('Schedule failed');
+      return true;
+    }
+    seqBtn.removeAttribute('data-scheduled-at');
+    seqBtn.removeAttribute('data-recipient-timezone');
+    seqBtn.removeAttribute('data-timezone-source');
+    discardComposeWindow(form);
+    showToast('Scheduled for ' + formatScheduleLabel(scheduledAt, recipientTz || (Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York')));
+    return true;
+  }
+
   function setupSendInterception() {
     document.addEventListener('click', async (e) => {
       if (!trackingEnabled || !serverUrl) return;
@@ -443,6 +574,25 @@
             await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
+
+        var activeDialog = target.closest('[role="dialog"]');
+        if (activeDialog) {
+          var activeBody = activeDialog.querySelector('div[contenteditable="true"]');
+          if (activeBody) {
+            var activeForm = findComposeForm(activeBody);
+            var seqBtn = activeForm.querySelector('[data-sequence-selector] button') ||
+              activeDialog.querySelector('[data-sequence-selector] button');
+            if (seqBtn && seqBtn.getAttribute('data-scheduled-at')) {
+              await processCompose(activeBody);
+              await new Promise(function(r) { setTimeout(r, 400); });
+              var didSchedule = await handleScheduledSend(activeBody, activeForm, seqBtn);
+              if (didSchedule) {
+                setTimeout(function() { isSending = false; }, 200);
+                return;
+              }
+            }
+          }
+        }
         
         console.log(LOG, 'All pixels injected, sending email now');
         
@@ -468,7 +618,7 @@
     console.log(LOG, 'addInboxReadIndicators called');
     
     // First, remove all existing indicators to prevent duplicates
-    document.querySelectorAll('.mail-tracker-status').forEach(el => el.remove());
+    document.querySelectorAll('.mail-tracker-status, [data-thread-intel]').forEach(el => el.remove());
     console.log(LOG, 'Cleared existing indicators');
     
     // Fetch tracking data ONCE before processing emails
@@ -529,7 +679,52 @@
       
       // Insert after email span
       emailSpan.parentNode.insertBefore(statusEl, emailSpan.nextSibling);
+
+      var intelBtn = document.createElement('button');
+      intelBtn.type = 'button';
+      intelBtn.setAttribute('data-thread-intel', tracker.id);
+      intelBtn.setAttribute('aria-label', 'Thread intelligence');
+      intelBtn.textContent = '\u2139';
+      intelBtn.style.cssText = 'display:inline-block;margin-left:4px;width:16px;height:16px;padding:0;border:none;background:transparent;color:#2563eb;cursor:pointer;font-size:12px;line-height:16px;vertical-align:middle;';
+      intelBtn.title = 'Thread intelligence';
+      intelBtn.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        fetchRecipientInfoExt(email).then(function(ri) {
+          showThreadIntelCard(tracker, ri, intelBtn);
+        });
+      });
+      statusEl.parentNode.insertBefore(intelBtn, statusEl.nextSibling);
+
       console.log(LOG, 'Added indicator for tracked email:', email);
+    });
+  }
+
+  async function injectThreadIntelligence() {
+    if (!serverUrl || !dashboardPassword) return;
+    var trackers = await getTrackingData();
+    document.querySelectorAll('div[role="listitem"] span[email]').forEach(function(span) {
+      var email = span.getAttribute('email');
+      if (!email) return;
+      var host = span.closest('div[role="listitem"]');
+      if (!host || host.querySelector('[data-thread-intel]')) return;
+      var tracker = trackers.find(function(t) { return t.recipient === email; });
+      if (!tracker) return;
+      var intelBtn = document.createElement('button');
+      intelBtn.type = 'button';
+      intelBtn.setAttribute('data-thread-intel', tracker.id);
+      intelBtn.setAttribute('aria-label', 'Thread intelligence');
+      intelBtn.textContent = '\u2139';
+      intelBtn.style.cssText = 'display:inline-block;margin-left:4px;width:16px;height:16px;padding:0;border:none;background:transparent;color:#2563eb;cursor:pointer;font-size:11px;line-height:16px;vertical-align:middle;';
+      intelBtn.title = 'Thread intelligence';
+      intelBtn.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        fetchRecipientInfoExt(email).then(function(ri) {
+          showThreadIntelCard(tracker, ri, intelBtn);
+        });
+      });
+      span.parentNode.insertBefore(intelBtn, span.nextSibling);
     });
   }
 
@@ -861,6 +1056,293 @@
     }, 0);
   }
 
+  async function fetchTrackerJson(trackerId) {
+    if (!serverUrl) return null;
+    try {
+      var headers = {};
+      if (dashboardPassword) headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+      var res = await fetch(serverUrl + '/s/' + encodeURIComponent(trackerId) + '?format=json', { headers: headers });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  async function fetchRecipientInfoExt(email) {
+    if (!serverUrl || !email) return null;
+    try {
+      var headers = {};
+      if (dashboardPassword) headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+      var defTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+      var url = serverUrl + '/recipient/info?email=' + encodeURIComponent(email) + '&defaultTimezone=' + encodeURIComponent(defTz);
+      var res = await fetch(url, { headers: headers });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  function hourHistogram(events, recipientTz) {
+    var tz = recipientTz || 'America/New_York';
+    var counts = new Array(24).fill(0);
+    if (!events) return counts;
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      if (!ev.time) continue;
+      var d = new Date(ev.time);
+      var parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', hour12: false }).formatToParts(d);
+      var hp = parts.find(function(p) { return p.type === 'hour'; });
+      var h = hp ? parseInt(hp.value, 10) : 0;
+      if (h >= 0 && h <= 23) counts[h]++;
+    }
+    return counts;
+  }
+
+  function relativeTime(iso) {
+    if (!iso) return '';
+    var diff = Date.now() - new Date(iso).getTime();
+    var mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    return days + 'd ago';
+  }
+
+  function expandThreadIntelCard(panel, trackerId, trackerSummary, recipientInfo, seqData) {
+    var anchor = panel._anchorEl;
+    panel.style.width = '400px';
+    panel.innerHTML = '';
+    panel._anchorEl = anchor;
+
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:14px;font-weight:600;color:#111827;margin-bottom:10px;';
+    title.textContent = 'Thread intelligence';
+    panel.appendChild(title);
+
+    if (seqData && seqData.steps) {
+      var seqTitle = document.createElement('div');
+      seqTitle.style.cssText = 'font-weight:600;margin-bottom:6px;font-size:12px;';
+      seqTitle.textContent = 'Sequence progress';
+      panel.appendChild(seqTitle);
+      var dots = document.createElement('div');
+      dots.style.cssText = 'display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;';
+      for (var s = 0; s < seqData.steps.length; s++) {
+        var st = seqData.steps[s];
+        var dot = document.createElement('span');
+        dot.style.cssText = 'width:10px;height:10px;border-radius:50%;background:' + (st.status === 'sent' ? '#22c55e' : st.status === 'pending' ? '#eab308' : '#9ca3af') + ';';
+        dot.title = 'Step ' + (s + 1) + ': ' + (st.status || '');
+        dots.appendChild(dot);
+      }
+      panel.appendChild(dots);
+    }
+
+    var scroll = document.createElement('div');
+    scroll.style.cssText = 'max-height:320px;overflow:auto;font-size:12px;color:#374151;';
+    panel.appendChild(scroll);
+
+    fetchTrackerJson(trackerId).then(function(full) {
+      scroll.innerHTML = '';
+      if (!full || !full.events || full.events.length === 0) {
+        var empty = document.createElement('div');
+        empty.textContent = 'No open events yet.';
+        scroll.appendChild(empty);
+        return;
+      }
+      var tz = recipientInfo && recipientInfo.timezone ? recipientInfo.timezone : 'America/New_York';
+      var hist = hourHistogram(full.events, tz);
+      var maxBar = Math.max.apply(null, hist);
+      if (maxBar === 0) maxBar = 1;
+
+      var histTitle = document.createElement('div');
+      histTitle.style.cssText = 'font-weight:600;margin-bottom:6px;';
+      histTitle.textContent = 'Opens by hour';
+      scroll.appendChild(histTitle);
+
+      var rowWrap = document.createElement('div');
+      for (var h = 0; h < 24; h++) {
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:2px;';
+        var lab = document.createElement('span');
+        lab.style.cssText = 'width:28px;color:#6b7280;';
+        lab.textContent = String(h);
+        var barBg = document.createElement('div');
+        barBg.style.cssText = 'flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;';
+        var barW = document.createElement('div');
+        barW.style.cssText = 'height:100%;width:' + (maxBar ? (hist[h] / maxBar) * 100 : 0) + '%;background:#2563eb;';
+        barBg.appendChild(barW);
+        var cnt = document.createElement('span');
+        cnt.style.cssText = 'width:20px;text-align:right;color:#6b7280;';
+        cnt.textContent = String(hist[h]);
+        row.appendChild(lab);
+        row.appendChild(barBg);
+        row.appendChild(cnt);
+        rowWrap.appendChild(row);
+      }
+      scroll.appendChild(rowWrap);
+
+      var tlTitle = document.createElement('div');
+      tlTitle.style.cssText = 'font-weight:600;margin:12px 0 6px;';
+      tlTitle.textContent = 'Timeline';
+      scroll.appendChild(tlTitle);
+
+      for (var i = full.events.length - 1; i >= 0; i--) {
+        var ev = full.events[i];
+        var line = document.createElement('div');
+        line.style.cssText = 'border-bottom:1px solid #e5e7eb;padding:6px 0;';
+        var t = ev.time ? new Date(ev.time).toLocaleString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' }) : '';
+        var loc = [ev.city, ev.region, ev.country].filter(Boolean).join(', ');
+        var dev = [ev.browser, ev.os, ev.device].filter(Boolean).join(' on ');
+        line.textContent = t + (loc ? ' · ' + loc : '') + (dev ? ' · ' + dev : '') + (ev.isp ? ' · ' + ev.isp : '');
+        scroll.appendChild(line);
+      }
+    });
+
+    var foot = document.createElement('div');
+    foot.style.cssText = 'margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+    var dash = document.createElement('a');
+    dash.href = serverUrl + '/s/' + encodeURIComponent(trackerId);
+    dash.target = '_blank';
+    dash.rel = 'noopener';
+    dash.style.cssText = 'color:#2563eb;font-size:12px;';
+    dash.textContent = 'Open in dashboard';
+    foot.appendChild(dash);
+    var collapse = document.createElement('button');
+    collapse.type = 'button';
+    collapse.style.cssText = 'background:none;border:none;color:#2563eb;cursor:pointer;font-size:12px;';
+    collapse.textContent = 'Collapse';
+    collapse.addEventListener('click', function() {
+      showThreadIntelCard(trackerSummary, recipientInfo, anchor);
+    });
+    foot.appendChild(collapse);
+    panel.appendChild(foot);
+  }
+
+  function findSequenceForTracker(trackerId, callback) {
+    if (!serverUrl) {
+      callback(null);
+      return;
+    }
+    var headers = {};
+    if (dashboardPassword) headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
+    fetch(serverUrl + '/sequences', { headers: headers })
+      .then(function(r) { return r.json(); })
+      .then(function(seqs) {
+        for (var i = 0; i < seqs.length; i++) {
+          if (seqs[i].trackerId === trackerId) {
+            callback(seqs[i]);
+            return;
+          }
+        }
+        callback(null);
+      })
+      .catch(function() { callback(null); });
+  }
+
+  function showThreadIntelCard(trackerSummary, recipientInfo, anchorEl) {
+    var existing = document.querySelector('.mail-tracker-thread-intel-panel');
+    if (existing) existing.remove();
+
+    var panel = document.createElement('div');
+    panel.className = 'mail-tracker-thread-intel-panel';
+    panel._anchorEl = anchorEl;
+    panel.style.cssText = 'position:fixed;z-index:100001;width:300px;background:#ffffff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:14px;font-family:Google Sans,Roboto,sans-serif;';
+
+    var big = document.createElement('div');
+    big.style.cssText = 'font-size:28px;font-weight:700;color:#111827;';
+    big.textContent = String(trackerSummary.opens || 0);
+    panel.appendChild(big);
+
+    var sub = document.createElement('div');
+    sub.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:8px;';
+    var last = trackerSummary.lastOpen;
+    var loc = recipientInfo ? [recipientInfo.city, recipientInfo.state, recipientInfo.country].filter(Boolean).join(', ') : '';
+    sub.textContent = 'Opens · Last: ' + (last ? relativeTime(last) : 'never') + (loc ? ' · ' + loc : '');
+    panel.appendChild(sub);
+
+    var devLine = document.createElement('div');
+    devLine.style.cssText = 'font-size:12px;color:#374151;margin-bottom:8px;';
+    devLine.textContent = 'Device: …';
+    panel.appendChild(devLine);
+
+    fetchTrackerJson(trackerSummary.id).then(function(full) {
+      if (full && full.events && full.events.length) {
+        var ev = full.events[full.events.length - 1];
+        devLine.textContent = 'Device: ' + [ev.browser, ev.os, ev.device].filter(Boolean).join(' on ');
+      }
+    });
+
+    var seqBadge = document.createElement('div');
+    seqBadge.style.cssText = 'font-size:11px;display:inline-block;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;margin-bottom:8px;';
+    seqBadge.textContent = 'Checking sequence…';
+    panel.appendChild(seqBadge);
+
+    findSequenceForTracker(trackerSummary.id, function(found) {
+      if (!found) {
+        seqBadge.textContent = 'No sequence';
+        seqBadge.style.background = '#f3f4f6';
+        seqBadge.style.color = '#4b5563';
+        return;
+      }
+      seqBadge.textContent = (found.status || 'active') + ' · step ' + (found.currentStep + 1) + '/' + (found.steps ? found.steps.length : '?');
+    });
+
+    var rec = document.createElement('div');
+    rec.style.cssText = 'font-size:12px;color:#374151;margin-bottom:8px;';
+    rec.textContent = recipientInfo ? [recipientInfo.company, recipientInfo.jobTitle].filter(Boolean).join(' · ') : 'Loading recipient…';
+    panel.appendChild(rec);
+
+    fetchRecipientInfoExt(trackerSummary.recipient).then(function(ri) {
+      if (ri) rec.textContent = [ri.company, ri.jobTitle].filter(Boolean).join(' · ') || '—';
+    });
+
+    var expand = document.createElement('button');
+    expand.type = 'button';
+    expand.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;margin-right:8px;';
+    expand.textContent = 'View full details';
+    expand.addEventListener('click', function(e) {
+      e.stopPropagation();
+      fetchRecipientInfoExt(trackerSummary.recipient).then(function(ri) {
+        findSequenceForTracker(trackerSummary.id, function(sq) {
+          expandThreadIntelCard(panel, trackerSummary.id, trackerSummary, ri || recipientInfo, sq);
+        });
+      });
+    });
+    panel.appendChild(expand);
+
+    var dashOpen = document.createElement('a');
+    dashOpen.href = serverUrl + '/s/' + encodeURIComponent(trackerSummary.id);
+    dashOpen.target = '_blank';
+    dashOpen.rel = 'noopener';
+    dashOpen.style.cssText = 'display:block;margin-top:6px;font-size:12px;color:#2563eb;';
+    dashOpen.textContent = 'Open in dashboard';
+    panel.appendChild(dashOpen);
+
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#6b7280;font-size:16px;cursor:pointer;';
+    close.textContent = '\u00d7';
+    close.addEventListener('click', function() { panel.remove(); });
+    panel.appendChild(close);
+
+    var rect = anchorEl.getBoundingClientRect();
+    panel.style.left = Math.min(window.innerWidth - 320, Math.max(8, rect.left)) + 'px';
+    panel.style.top = Math.min(window.innerHeight - 280, Math.max(8, rect.bottom + 8)) + 'px';
+
+    document.body.appendChild(panel);
+
+    var closeOutside = function(e) {
+      if (!panel.contains(e.target) && !anchorEl.contains(e.target)) {
+        panel.remove();
+        document.removeEventListener('click', closeOutside, true);
+      }
+    };
+    setTimeout(function() { document.addEventListener('click', closeOutside, true); }, 0);
+  }
+
   function injectSequenceSelector(composeForm) {
     if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
 
@@ -942,12 +1424,149 @@
       const templates = await getTemplates();
       dropdown.textContent = '';
 
+      const schedHeader = document.createElement('div');
+      schedHeader.style.cssText = 'padding:4px 14px;color:#71717a;font-size:11px;';
+      schedHeader.textContent = 'SCHEDULE SEND';
+      dropdown.appendChild(schedHeader);
+
+      const optimizeRow = document.createElement('div');
+      optimizeRow.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;display:flex;align-items:center;gap:6px;';
+      const dotOpt = document.createElement('span');
+      dotOpt.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#9ca3af;flex-shrink:0;';
+      optimizeRow.appendChild(dotOpt);
+      const optLabel = document.createElement('span');
+      optLabel.textContent = 'Optimize for recipient…';
+      optimizeRow.appendChild(optLabel);
+      optimizeRow.addEventListener('mouseenter', function() { optimizeRow.style.background = '#3f3f46'; });
+      optimizeRow.addEventListener('mouseleave', function() { optimizeRow.style.background = 'none'; });
+      dropdown.appendChild(optimizeRow);
+
+      const pickRow = document.createElement('div');
+      pickRow.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
+      pickRow.textContent = 'Pick date & time';
+      pickRow.addEventListener('mouseenter', function() { pickRow.style.background = '#3f3f46'; });
+      pickRow.addEventListener('mouseleave', function() { pickRow.style.background = 'none'; });
+      dropdown.appendChild(pickRow);
+
+      const pickPanel = document.createElement('div');
+      pickPanel.style.cssText = 'display:none;padding:8px 14px 10px;border-bottom:1px solid #3f3f46;';
+      var pickLocal = document.createElement('input');
+      pickLocal.type = 'datetime-local';
+      pickLocal.style.cssText = 'width:100%;margin-bottom:8px;font-size:12px;padding:4px;border-radius:6px;border:1px solid #52525b;background:#18181b;color:#e4e4e7;';
+      pickPanel.appendChild(pickLocal);
+      var tzLab = document.createElement('label');
+      tzLab.style.cssText = 'font-size:11px;color:#a1a1aa;display:block;margin-bottom:4px;';
+      tzLab.textContent = 'Timezone';
+      pickPanel.appendChild(tzLab);
+      var tzSel = document.createElement('select');
+      tzSel.style.cssText = 'width:100%;font-size:12px;padding:4px;border-radius:6px;margin-bottom:8px;background:#18181b;color:#e4e4e7;border:1px solid #52525b;';
+      var zones = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Australia/Sydney'];
+      var userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+      zones.forEach(function(z) {
+        var o = document.createElement('option');
+        o.value = z;
+        o.textContent = z;
+        if (z === userTz) o.selected = true;
+        tzSel.appendChild(o);
+      });
+      if (zones.indexOf(userTz) === -1) {
+        var o2 = document.createElement('option');
+        o2.value = userTz;
+        o2.textContent = userTz;
+        o2.selected = true;
+        tzSel.appendChild(o2);
+      }
+      pickPanel.appendChild(tzSel);
+      var pickConfirm = document.createElement('button');
+      pickConfirm.type = 'button';
+      pickConfirm.textContent = 'Confirm schedule';
+      pickConfirm.style.cssText = 'background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;width:100%;';
+      pickConfirm.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        if (!pickLocal.value) {
+          showToast('Pick a date and time');
+          return;
+        }
+        var d = new Date(pickLocal.value);
+        if (isNaN(d.getTime())) {
+          showToast('Invalid date/time');
+          return;
+        }
+        btn.setAttribute('data-scheduled-at', d.toISOString());
+        btn.setAttribute('data-recipient-timezone', tzSel.value);
+        btn.setAttribute('data-timezone-source', 'manual');
+        dropdown.style.display = 'none';
+        showToast('Click Send to schedule for ' + formatScheduleLabel(d.toISOString(), tzSel.value));
+      });
+      pickPanel.appendChild(pickConfirm);
+      dropdown.appendChild(pickPanel);
+
+      pickRow.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        pickPanel.style.display = pickPanel.style.display === 'none' ? 'block' : 'none';
+      });
+
+      var recs = getRecipients(composeForm);
+      if (recs.length > 0 && serverUrl) {
+        fetch(serverUrl + '/recipient/info?email=' + encodeURIComponent(recs[0]), { headers: authHeadersBasicOnly() })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(info) {
+            if (!info) return;
+            var tz = info.timezone || 'America/New_York';
+            var hour = info.optimalSendTime && info.optimalSendTime.hour != null ? info.optimalSendTime.hour : 9;
+            var iso = computeNextBusinessSendAt(hour, tz);
+            var src = info.timezoneSource || 'default';
+            if (src === 'hubspot') dotOpt.style.background = '#22c55e';
+            else if (src === 'tld' || src === 'open_history') dotOpt.style.background = '#eab308';
+            else dotOpt.style.background = '#9ca3af';
+            optLabel.textContent = 'Optimize for recipient — ' + formatScheduleLabel(iso, tz);
+            optimizeRow._iso = iso;
+            optimizeRow._tz = tz;
+            optimizeRow._info = info;
+          })
+          .catch(function() {});
+      }
+
+      optimizeRow.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        if (!optimizeRow._iso) {
+          showToast('Recipient timezone not loaded yet — try again');
+          return;
+        }
+        btn.setAttribute('data-scheduled-at', optimizeRow._iso);
+        btn.setAttribute('data-recipient-timezone', optimizeRow._tz || '');
+        btn.setAttribute('data-timezone-source', optimizeRow._info && optimizeRow._info.timezoneSource ? optimizeRow._info.timezoneSource : '');
+        dropdown.style.display = 'none';
+        showToast('Click Send to schedule for ' + formatScheduleLabel(optimizeRow._iso, optimizeRow._tz));
+      });
+
+      const sendNowRow = document.createElement('div');
+      sendNowRow.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
+      sendNowRow.textContent = 'Send now';
+      sendNowRow.addEventListener('mouseenter', function() { sendNowRow.style.background = '#3f3f46'; });
+      sendNowRow.addEventListener('mouseleave', function() { sendNowRow.style.background = 'none'; });
+      sendNowRow.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        btn.removeAttribute('data-scheduled-at');
+        btn.removeAttribute('data-recipient-timezone');
+        btn.removeAttribute('data-timezone-source');
+        dropdown.style.display = 'none';
+      });
+      dropdown.appendChild(sendNowRow);
+
+      const schedDivider = document.createElement('div');
+      schedDivider.style.cssText = 'border-top:1px solid #3f3f46;margin:4px 0;';
+      dropdown.appendChild(schedDivider);
+
       const noSeq = document.createElement('div');
       noSeq.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#e4e4e7;';
       noSeq.textContent = 'No sequence';
       noSeq.addEventListener('click', function() {
         btn.setAttribute('data-selected-template', '');
         btn.setAttribute('data-oneoff-steps', '');
+        btn.removeAttribute('data-scheduled-at');
+        btn.removeAttribute('data-recipient-timezone');
+        btn.removeAttribute('data-timezone-source');
         setSequenceBtnState(btn, svg, false, 'Select sequence');
         dropdown.style.display = 'none';
       });
@@ -1459,6 +2078,8 @@
           if (form) injectSequenceSelector(form);
         });
       }
+
+      injectThreadIntelligence();
     }, 1000);
   }
 

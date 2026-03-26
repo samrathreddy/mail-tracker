@@ -36,6 +36,7 @@ export async function handleCron(env) {
   try {
     await sendDueFollowUps(env);
     await maybeCheckReplies(env);
+    await sendDueScheduledEmails(env);
   } finally {
     await env.SEQUENCES.delete('cron:lock');
   }
@@ -291,6 +292,42 @@ async function maybeCheckReplies(env) {
   }
 
   await env.SEQUENCES.put('cron:lastReplyCheck', new Date().toISOString());
+}
+
+async function sendDueScheduledEmails(env) {
+  const { error: authError } = await getAccessToken(env);
+  if (authError) return;
+
+  const allKeys = await listAllKeys(env.SEQUENCES, 'sched:');
+  const now = Date.now();
+
+  for (const key of allKeys) {
+    const scheduled = await env.SEQUENCES.get(key.name, 'json');
+    if (!scheduled || scheduled.status !== 'pending') continue;
+
+    const scheduledTime = new Date(scheduled.scheduledAt).getTime();
+    if (scheduledTime > now) continue;
+
+    const result = await sendFollowUp(env, {
+      to: scheduled.to,
+      subject: scheduled.subject,
+      body: scheduled.body,
+      threadId: null,
+      inReplyTo: null,
+      cc: scheduled.cc || null,
+      bcc: scheduled.bcc || null,
+    });
+
+    if (result.error) {
+      console.error('Scheduled email send failed:', result.error);
+      continue;
+    }
+
+    scheduled.status = 'sent';
+    scheduled.sentAt = new Date().toISOString();
+    scheduled.sentMessageId = result.messageId;
+    await env.SEQUENCES.put(key.name, JSON.stringify(scheduled));
+  }
 }
 
 /**

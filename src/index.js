@@ -12,6 +12,7 @@ import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTem
 import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
 import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
 import { handleCron, recordOpenForAnalytics } from './cron.js';
+import { getRecipientInfo } from './hubspot.js';
 
 function parseUA(ua) {
   let browser = 'Unknown', os = 'Unknown', device;
@@ -664,6 +665,60 @@ export default {
       if (!checkAuth(request, env)) return requireAuthCors();
       await disconnectOAuth(env);
       return json({ disconnected: true });
+    }
+
+    // === RECIPIENT INFO & SCHEDULED EMAIL (extension API) ===
+
+    if (url.pathname === '/recipient/info' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const email = url.searchParams.get('email');
+      if (!email) return json({ error: 'email parameter required' }, 400);
+      const defaultTz = url.searchParams.get('defaultTimezone') || 'America/New_York';
+      const info = await getRecipientInfo(env, email, defaultTz);
+      return json(info);
+    }
+
+    if (url.pathname === '/scheduled' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      if (!body.to || !body.subject || !body.body || !body.scheduledAt) {
+        return json({ error: 'to, subject, body, and scheduledAt are required' }, 400);
+      }
+      const id = `sched:${crypto.randomUUID().slice(0, 8)}`;
+      const scheduled = {
+        id, to: body.to, cc: body.cc || '', bcc: body.bcc || '',
+        subject: body.subject, body: body.body,
+        scheduledAt: body.scheduledAt,
+        recipientTimezone: body.recipientTimezone || null,
+        timezoneSource: body.timezoneSource || null,
+        trackerId: body.trackerId || null,
+        sequenceId: body.sequenceId || null,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      await env.SEQUENCES.put(id, JSON.stringify(scheduled));
+      return json(scheduled, 201);
+    }
+
+    if (url.pathname === '/scheduled' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
+      const keys = await env.SEQUENCES.list({ prefix: 'sched:' });
+      const items = await Promise.all(keys.keys.map(k => env.SEQUENCES.get(k.name, 'json')));
+      return json(items.filter(Boolean));
+    }
+
+    if (url.pathname.match(/^\/scheduled\/sched:[a-f0-9]+$/) && request.method === 'DELETE') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
+      const id = url.pathname.split('/scheduled/')[1];
+      const existing = await env.SEQUENCES.get(id, 'json');
+      if (!existing) return json({ error: 'Not found' }, 404);
+      if (existing.status === 'sent') return json({ error: 'Already sent' }, 400);
+      await env.SEQUENCES.delete(id);
+      return json({ deleted: id });
     }
 
     // === ANALYTICS ROUTES ===

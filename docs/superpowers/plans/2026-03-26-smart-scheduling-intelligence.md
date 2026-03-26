@@ -1,5 +1,7 @@
 # Smart Scheduling & Thread Intelligence Implementation Plan
 
+**Progress (2026-03-26):** Tasks 1–5 are implemented in the repo. `pnpm lint` passes with zero ESLint errors (no project test runner). `src/gmail-api.js` supports optional `Cc` on scheduled sends. Remaining operator-only steps: set `HUBSPOT_ACCESS_TOKEN`, run `pnpm run deploy`, and run the manual QA checklist in Task 6.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add HubSpot-powered recipient timezone lookup, timezone-optimized email scheduling, smart send time learning from open data, and a thread intelligence sidebar in Gmail.
@@ -35,7 +37,7 @@
 **Files:**
 - Create: `src/hubspot.js`
 
-- [ ] **Step 1: Create `src/hubspot.js`**
+- [x] **Step 1: Create `src/hubspot.js`**
 
 Create the module with three exports:
 
@@ -70,12 +72,12 @@ Create the module with three exports:
 
 The tracker scanning for open history and optimal send time requires iterating `env.TRACKER.list()` and checking events. Use the same `listAllKeys` pagination pattern from `cron.js` if needed.
 
-- [ ] **Step 2: Verify module loads**
+- [x] **Step 2: Verify module loads**
 
 Run: `node -e "import('./src/hubspot.js').then(m => console.log(Object.keys(m)))"`
 Expected: `[ 'lookupRecipient', 'inferTimezoneFromTLD', 'getOptimalSendTime', 'getRecipientInfo' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/hubspot.js
@@ -89,7 +91,7 @@ git commit -m "feat: add HubSpot integration module with timezone lookup and sma
 **Files:**
 - Modify: `src/index.js`
 
-- [ ] **Step 1: Add import and routes**
+- [x] **Step 1: Add import and routes**
 
 Add import at top of `src/index.js`:
 ```javascript
@@ -159,11 +161,11 @@ if (url.pathname.match(/^\/scheduled\/sched:[a-f0-9]+$/) && request.method === '
 }
 ```
 
-- [ ] **Step 2: Run lint and fix**
+- [x] **Step 2: Run lint and fix**
 
 Run: `pnpm lint`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/index.js
@@ -177,7 +179,7 @@ git commit -m "feat: add recipient info and scheduled email API routes"
 **Files:**
 - Modify: `src/cron.js`
 
-- [ ] **Step 1: Add `sendDueScheduledEmails` function and wire it into `handleCron`**
+- [x] **Step 1: Add `sendDueScheduledEmails` function and wire it into `handleCron`**
 
 Import `sendFollowUp` is already imported. Add the new function after `maybeCheckReplies`:
 
@@ -226,11 +228,11 @@ In `handleCron`, add the call after `maybeCheckReplies`:
 await sendDueScheduledEmails(env);
 ```
 
-- [ ] **Step 2: Run lint and fix**
+- [x] **Step 2: Run lint and fix**
 
 Run: `pnpm lint`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cron.js
@@ -246,7 +248,7 @@ git commit -m "feat: add scheduled email sending to cron handler"
 
 This is the largest task — adding the schedule send panel to the sequence selector dropdown.
 
-- [ ] **Step 1: Add schedule send section to the sequence selector dropdown**
+- [x] **Step 1: Add schedule send section to the sequence selector dropdown**
 
 In `injectSequenceSelector`, after the dropdown div is created but before the template options are added, insert the schedule send section:
 
@@ -289,11 +291,11 @@ In `processCompose`, if a schedule time was selected (stored as `data-scheduled-
 
 All UI built with DOM APIs (createElement/textContent).
 
-- [ ] **Step 2: Run lint and fix**
+- [x] **Step 2: Run lint and fix**
 
 Run: `pnpm lint`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add extension/gmail.js
@@ -307,7 +309,7 @@ git commit -m "feat: add schedule send UI with timezone optimization to Gmail co
 **Files:**
 - Modify: `extension/gmail.js`
 
-- [ ] **Step 1: Add thread intelligence icon and sidebar panel**
+- [x] **Step 1: Add thread intelligence icon and sidebar panel**
 
 **Icon injection:**
 Add a new function `injectThreadIntelligence()` that runs periodically (via the existing `setInterval`):
@@ -345,11 +347,11 @@ All built with DOM APIs. Light theme styling matching the spam checker panel.
 **Integration with existing sent folder code:**
 The existing `addInboxReadIndicators()` already iterates sent email rows. Add the ℹ icon injection there, right after the ✓/✓✓ indicator.
 
-- [ ] **Step 2: Run lint and fix**
+- [x] **Step 2: Run lint and fix**
 
 Run: `pnpm lint`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add extension/gmail.js
@@ -363,17 +365,17 @@ git commit -m "feat: add thread intelligence sidebar with compact and expanded v
 **Files:**
 - All modified files
 
-- [ ] **Step 1: Run lint**
+- [x] **Step 1: Run lint**
 
 Run: `pnpm lint`
 Fix all errors.
 
-- [ ] **Step 2: Set up HubSpot secret**
+- [ ] **Step 2: Set up HubSpot secret** *(operator / deployment environment)*
 
 Run: `pnpm exec wrangler secret put HUBSPOT_ACCESS_TOKEN`
 Enter your HubSpot Static Auth access token.
 
-- [ ] **Step 3: Deploy and test**
+- [ ] **Step 3: Deploy and test** *(operator)*
 
 Run: `pnpm run deploy`
 
@@ -385,7 +387,7 @@ Test:
 - Click ℹ icon on a tracked sent email — verify compact card shows data
 - Expand to full view — verify timeline and sequence status
 
-- [ ] **Step 4: Commit any fixes**
+- [ ] **Step 4: Commit any fixes** *(optional after QA)*
 
 ```bash
 git add -A
