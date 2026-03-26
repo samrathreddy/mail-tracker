@@ -95,8 +95,7 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
       </div>`;
   }
 
-  // -- Pixel snippet section --
-  const _pixelUrl = `\${location.origin}/t/${esc(id)}`;
+  // -- Pixel snippet section (content populated client-side) --
   const pixelSnippet = `
     <div class="panel">
       <div class="panel-title">Pixel Snippet</div>
