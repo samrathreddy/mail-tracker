@@ -11,7 +11,10 @@
       "Bash(pnpm lint:*)",
       "Bash(for f:*)",
       "Bash(do echo:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(/Users/beckett/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh --project-dir /Users/beckett/Projects/github_clones/mail-tracker 2>&1)",
+      "Bash(node -e \"import\\(''''./$f''''\\).then\\(\\(\\) => console.log\\(''''OK''''\\)\\).catch\\(e => console.log\\(''''FAIL: '''' + e.message\\)\\)\")",
+      "Bash(grep -v \"Use \\\\`node\")"
     ]
   }
 }
