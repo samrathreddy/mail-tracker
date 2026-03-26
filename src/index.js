@@ -13,6 +13,33 @@ import { validateSequence, createSequence, listSequences, getSequence, stopSeque
 import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
 import { handleCron, recordOpenForAnalytics } from './cron.js';
 
+function parseUA(ua) {
+  let browser = 'Unknown', os = 'Unknown', device;
+
+  // Browser detection
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/OPR\//i.test(ua) || /Opera/i.test(ua)) browser = 'Opera';
+  else if (/Chrome\//i.test(ua) && !/Edg/i.test(ua)) browser = 'Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/MSIE|Trident/i.test(ua)) browser = 'IE';
+
+  // OS detection
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Mac OS X|macOS/i.test(ua)) os = 'macOS';
+  else if (/Linux/i.test(ua) && !/Android/i.test(ua)) os = 'Linux';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS';
+
+  // Device type
+  if (/Mobile|Android.*Mobile|iPhone|iPod/i.test(ua)) device = 'Mobile';
+  else if (/iPad|Android(?!.*Mobile)|Tablet/i.test(ua)) device = 'Tablet';
+  else device = 'Desktop';
+
+  return { browser, os, device };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -34,11 +61,24 @@ export default {
       const userAgent = request.headers.get('user-agent') || 'unknown';
       const now = new Date().toISOString();
 
+      // Extract Cloudflare geo/network metadata
+      const cf = request.cf || {};
+      const city = cf.city || 'unknown';
+      const region = cf.region || 'unknown';
+      const cfTimezone = cf.timezone || 'unknown';
+      const asn = cf.asn || null;
+      const asOrganization = cf.asOrganization || 'unknown';
+      const latitude = cf.latitude || null;
+      const longitude = cf.longitude || null;
+
       // Filter 1: Sender IP exclusion
       if (existing.senderIp && existing.senderIp === ip) {
         existing.skipped = (existing.skipped || 0) + 1;
         existing.filteredEvents = existing.filteredEvents || [];
-        existing.filteredEvents.push({ time: now, ip, reason: 'sender_ip' });
+        existing.filteredEvents.push({
+          time: now, ip, reason: 'sender_ip',
+          city, region, timezone: cfTimezone, isp: asOrganization,
+        });
         if (existing.filteredEvents.length > 20) existing.filteredEvents = existing.filteredEvents.slice(-20);
         await env.TRACKER.put(id, JSON.stringify(existing));
         return servePixel();
@@ -48,7 +88,10 @@ export default {
       if (isBot(userAgent)) {
         existing.skipped = (existing.skipped || 0) + 1;
         existing.filteredEvents = existing.filteredEvents || [];
-        existing.filteredEvents.push({ time: now, ip, userAgent, reason: 'bot_proxy' });
+        existing.filteredEvents.push({
+          time: now, ip, userAgent, reason: 'bot_proxy',
+          city, region, timezone: cfTimezone, isp: asOrganization,
+        });
         if (existing.filteredEvents.length > 20) existing.filteredEvents = existing.filteredEvents.slice(-20);
         await env.TRACKER.put(id, JSON.stringify(existing));
         return servePixel();
@@ -61,22 +104,29 @@ export default {
         if (new Date(now).getTime() - lastTime < DEDUP_WINDOW_MS) return servePixel();
       }
 
-      // Genuine open
+      // Genuine open — parse user-agent into structured fields
+      const parsed = parseUA(userAgent || '');
       existing.opens += 1;
-      existing.events.push({ time: now, ip, country, userAgent });
+      existing.events.push({
+        time: now, ip, country, userAgent,
+        city, region, timezone: cfTimezone,
+        asn, isp: asOrganization,
+        lat: latitude, lon: longitude,
+        browser: parsed.browser, os: parsed.os, device: parsed.device,
+      });
       if (existing.events.length > 100) existing.events = existing.events.slice(-100);
       await env.TRACKER.put(id, JSON.stringify(existing));
 
       // Send webhook notifications
       const timeStr = new Date(now).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-      const timezone = new Date(now).toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+      const notifTimezone = new Date(now).toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop();
 
       await sendWebhookNotifications(env, {
         recipient: existing.recipient,
         subject: existing.subject,
         opens: existing.opens,
         country, ip,
-        time: `${timeStr} (${timezone})`
+        time: `${timeStr} (${notifTimezone})`
       });
 
       // Check if this open should stop an active sequence
@@ -363,10 +413,24 @@ export default {
         // Open events
         if (data.events) {
           for (const evt of data.events) {
+            const locationParts = [];
+            if (evt.city && evt.city !== 'unknown') locationParts.push(esc(evt.city));
+            if (evt.region && evt.region !== 'unknown') locationParts.push(esc(evt.region));
+            if (evt.country && evt.country !== 'unknown') locationParts.push(esc(evt.country));
+            const locationStr = locationParts.join(', ');
+
+            const deviceParts = [];
+            if (evt.browser && evt.browser !== 'Unknown') deviceParts.push(evt.browser);
+            if (evt.os && evt.os !== 'Unknown') deviceParts.push(evt.os);
+            const deviceStr = deviceParts.length > 0 ? esc(deviceParts.join(' on ')) : '';
+
+            const detailParts = [locationStr, deviceStr].filter(Boolean);
+
             allEvents.push({
               type: 'open',
               time: evt.time,
               description: `<strong>${esc(recipient)}</strong> opened <em>${esc(subject)}</em>`,
+              detail: detailParts.length > 0 ? detailParts.join(' \u00b7 ') : null,
             });
           }
         }
@@ -456,7 +520,7 @@ export default {
             else timeAgo = new Date(evt.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           }
         }
-        return { type: evt.type, description: evt.description, timeAgo };
+        return { type: evt.type, description: evt.description, detail: evt.detail || null, timeAgo };
       });
 
       // Check OAuth status
