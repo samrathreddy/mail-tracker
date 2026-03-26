@@ -690,12 +690,32 @@
     container.appendChild(btn);
     container.appendChild(dropdown);
 
-    // Insert at the end of the send row, with visual separation from Send button
-    // Insert right after the Send button, not at the end of the row
-    if (sendButton.nextSibling) {
-      sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
+    // Strategy: Find Gmail's compose toolbar row (the icons row with Aa, attach, emoji, etc.)
+    // This is a separate td/div from the Send button, in the same bottom area.
+    // Try multiple selectors since Gmail's classes change:
+    const composeToolbar =
+      composeForm.querySelector('.btC td.gU') ||        // Classic Gmail toolbar cell
+      composeForm.querySelector('.aDh') ||               // Another toolbar container
+      composeForm.querySelector('[command="Files"]')?.closest('div') || // Near attach button
+      composeForm.querySelector('div[aria-label*="more options"]')?.parentElement || // Near "more options"
+      null;
+
+    if (composeToolbar) {
+      // Place in the toolbar row alongside other icons
+      composeToolbar.appendChild(container);
     } else {
-      sendButton.parentElement.appendChild(container);
+      // Fallback: place in the same table row as Send, but in a new cell or after Send's parent
+      const sendTd = sendButton.closest('td');
+      if (sendTd && sendTd.nextElementSibling) {
+        // Insert into the next cell (typically the toolbar cell)
+        sendTd.nextElementSibling.appendChild(container);
+      } else {
+        // Last resort: after Send button with spacing
+        container.style.marginLeft = '8px';
+        container.style.borderLeft = '1px solid #dadce0';
+        container.style.paddingLeft = '8px';
+        sendButton.parentElement.appendChild(container);
+      }
     }
   }
 
