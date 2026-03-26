@@ -196,6 +196,9 @@ export default {
 
       const list = await env.TRACKER.list();
       const results = [];
+      const now = Date.now();
+      const sparkline = [0, 0, 0, 0, 0, 0, 0];
+
       for (const key of list.keys) {
         const data = await env.TRACKER.get(key.name, 'json');
         const result = {
@@ -206,6 +209,18 @@ export default {
           createdAt: data?.createdAt || null,
           sequenceProgress: null,
         };
+
+        // Aggregate event timestamps into sparkline (last 7 days)
+        if (data?.events) {
+          for (const evt of data.events) {
+            const eventTime = new Date(evt.time).getTime();
+            const dayIndex = 6 - Math.floor((now - eventTime) / 86400000);
+            if (dayIndex >= 0 && dayIndex <= 6) {
+              sparkline[dayIndex]++;
+            }
+          }
+        }
+
         if (env.SEQUENCES) {
           const seqId = await env.SEQUENCES.get(`tracker-seq:${key.name}`);
           if (seqId) {
@@ -231,7 +246,28 @@ export default {
       const totalOpens = results.reduce((s, r) => s + r.opens, 0);
       const activeCount = results.filter(r => r.opens > 0).length;
 
-      return html(renderDashboard(results, totalOpens, activeCount));
+      // Sequence stats
+      let sequences = { active: 0, completed: 0, stopped: 0, total: 0 };
+      let oauthConnected = false;
+      if (env.SEQUENCES) {
+        const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+        for (const k of seqKeys.keys) {
+          const seq = await env.SEQUENCES.get(k.name, 'json');
+          if (seq) {
+            sequences.total++;
+            if (seq.status === 'active') sequences.active++;
+            else if (seq.status === 'completed') sequences.completed++;
+            else if (seq.status === 'stopped') sequences.stopped++;
+          }
+        }
+        const tokens = await env.SEQUENCES.get('oauth:tokens');
+        oauthConnected = !!tokens;
+      }
+
+      return html(renderDashboard({
+        results, totalOpens, activeCount, sparkline,
+        totalTrackers: results.length, sequences, oauthConnected,
+      }));
     }
 
     // === HTML VIEW ROUTES (must come before JSON API routes) ===
