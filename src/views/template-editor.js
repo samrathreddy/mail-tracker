@@ -1863,7 +1863,8 @@ function buildClientScripts(template) {
       panel.appendChild(ringWrap);
 
       // Helper to add a metric row
-      function addMetric(label, value, barPercent, severity) {
+      // inverted=true means higher is BETTER (red-yellow-green left to right) — used for spintax & word count
+      function addMetric(label, value, barPercent, severity, inverted) {
         var metric = document.createElement('div');
         metric.className = 'spam-metric';
         var header = document.createElement('div');
@@ -1881,6 +1882,9 @@ function buildClientScripts(template) {
 
         var bar = document.createElement('div');
         bar.className = 'spam-bar';
+        if (inverted) {
+          bar.style.background = 'linear-gradient(90deg, #ef4444 0%, #ef4444 33%, #eab308 33%, #eab308 66%, #22c55e 66%, #22c55e 100%)';
+        }
         var marker = document.createElement('div');
         marker.className = 'spam-bar-marker';
         marker.style.left = Math.min(100, Math.max(0, barPercent)) + '%';
@@ -1914,9 +1918,10 @@ function buildClientScripts(template) {
       }
       panel.appendChild(spamMetric);
 
-      // Spintax & Variables
+      // Spintax & Variables (inverted: higher = better, bar goes red→green)
       var spintaxSeverity = data.spintaxPercent >= 10 ? 'green' : data.spintaxPercent >= 5 ? 'yellow' : 'red';
-      panel.appendChild(addMetric('Spintax & Variables', data.spintaxPercent + '%', Math.min(100, data.spintaxPercent * 5), spintaxSeverity));
+      var spintaxBarPct = Math.min(100, data.spintaxPercent * 2.5);
+      panel.appendChild(addMetric('Spintax & Variables', data.spintaxPercent + '%', spintaxBarPct, spintaxSeverity, true));
 
       // Links
       var linkSeverity = data.linkCount === 0 ? 'green' : data.linkCount <= 2 ? 'yellow' : 'red';
@@ -1931,11 +1936,15 @@ function buildClientScripts(template) {
       var emojiSeverity = data.emojiCount <= 1 ? 'green' : data.emojiCount <= 3 ? 'yellow' : 'red';
       panel.appendChild(addMetric('Emojis', data.emojiCount, Math.min(100, data.emojiCount * 15), emojiSeverity));
 
-      // Word Count
+      // Word Count (custom bar: red-yellow-green-yellow-red for sweet spot in middle)
       var wcSeverity = (data.wordCount >= 25 && data.wordCount <= 100) ? 'green'
         : ((data.wordCount >= 15 && data.wordCount < 25) || (data.wordCount > 100 && data.wordCount <= 150)) ? 'yellow' : 'red';
       var wcBarPct = Math.min(100, (data.wordCount / 150) * 100);
-      panel.appendChild(addMetric('Word Count', data.wordCount, wcBarPct, wcSeverity));
+      var wcMetric = addMetric('Word Count', '~' + data.wordCount, wcBarPct, wcSeverity);
+      // Override bar gradient for word count: red-yellow-green-yellow-red
+      var wcBar = wcMetric.querySelector('.spam-bar');
+      if (wcBar) wcBar.style.background = 'linear-gradient(90deg, #ef4444 0%, #eab308 10%, #eab308 17%, #22c55e 17%, #22c55e 67%, #eab308 67%, #eab308 80%, #ef4444 80%, #ef4444 100%)';
+      panel.appendChild(wcMetric);
 
       // Recommendations
       var recs = [];
