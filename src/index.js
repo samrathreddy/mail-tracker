@@ -112,7 +112,9 @@ export default {
         }
       }
 
-      return html(renderDetail(id, data, sequenceInfo));
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+
+      return html(renderDetail(id, data, sequenceInfo, oauthConnected));
     }
 
     // GET/POST /new — create a new tracking pixel
