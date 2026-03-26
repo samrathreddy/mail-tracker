@@ -23,29 +23,31 @@ export function renderActivityPage(events, totalCount, offset, oauthConnected) {
   // -- Event rows --
   const eventRowsHtml = events.map(evt => {
     const dotColor = getDotColor(evt.type);
+    const borderColor = getBorderColor(evt.type);
     const glowStyle = evt.type === 'open'
       ? 'box-shadow:0 0 6px rgba(34,197,94,0.4);'
       : '';
 
     const dataType = getFilterType(evt.type);
+    const fullTime = evt.fullTime ? ` title="${esc(evt.fullTime)}"` : '';
 
-    return `<div class="event-row" data-type="${esc(dataType)}">
+    return `<div class="event-row event-row-accent" data-type="${esc(dataType)}" style="border-left-color:${borderColor};padding:10px 12px;">
       <div class="event-dot" style="background:${dotColor};${glowStyle}"></div>
       <div class="event-text">${evt.description}</div>
-      <div class="event-time">${esc(evt.timeAgo)}</div>
+      <div class="event-time"${fullTime}>${esc(evt.timeAgo)}</div>
     </div>`;
   }).join('');
 
-  // -- Load more link --
+  // -- Load more button --
   const loadMoreHtml = events.length >= 50
-    ? `<div style="text-align:center;padding:16px;">
-        <a href="/activity?offset=${offset + 50}" style="color:var(--accent-light);font-size:12px;text-decoration:none;">Load more</a>
+    ? `<div style="text-align:center;padding:20px;">
+        <a href="/activity?offset=${offset + 50}" class="btn-ghost" style="text-decoration:none;width:100%;max-width:320px;">Load more events</a>
       </div>`
     : '';
 
   // -- Empty state --
   const emptyHtml = events.length === 0
-    ? '<div style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px;">No activity yet</div>'
+    ? '<div class="empty-state"><p>No activity yet</p></div>'
     : '';
 
   // -- Body --
@@ -89,6 +91,26 @@ export function renderActivityPage(events, totalCount, offset, oauthConnected) {
     scripts,
     oauthConnected,
   });
+}
+
+/**
+ * Maps event type to a CSS border color for the left accent.
+ */
+function getBorderColor(type) {
+  switch (type) {
+  case 'open':
+    return 'var(--success)';
+  case 'follow_up_sent':
+  case 'sequence_completed':
+    return 'var(--accent)';
+  case 'sequence_stopped':
+    return 'var(--warning)';
+  case 'filtered':
+    return 'var(--text-muted)';
+  case 'tracker_created':
+  default:
+    return 'var(--border)';
+  }
 }
 
 /**

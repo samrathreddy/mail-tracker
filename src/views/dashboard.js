@@ -299,31 +299,39 @@ export function renderDashboard(opts) {
     var modalForm = document.getElementById('modalForm');
     var modalResult = document.getElementById('modalResult');
 
-    document.getElementById('newBtn').addEventListener('click', function() {
+    var modalInner = document.getElementById('modalInner');
+
+    function openModal() {
       modalForm.style.display = '';
       modalResult.style.display = 'none';
       document.getElementById('inputTo').value = '';
       document.getElementById('inputSubject').value = '';
       overlay.style.opacity = '1';
       overlay.style.pointerEvents = 'auto';
-    });
+      requestAnimationFrame(function() {
+        modalInner.style.opacity = '1';
+        modalInner.style.transform = 'translateY(0)';
+      });
+    }
 
-    document.getElementById('cancelBtn').addEventListener('click', function() {
+    function closeModal(reload) {
+      modalInner.style.opacity = '0';
+      modalInner.style.transform = 'translateY(8px)';
       overlay.style.opacity = '0';
       overlay.style.pointerEvents = 'none';
-    });
+      if (reload) setTimeout(function() { location.reload(); }, 200);
+    }
 
-    document.getElementById('closeResult').addEventListener('click', function() {
-      overlay.style.opacity = '0';
-      overlay.style.pointerEvents = 'none';
-      location.reload();
-    });
+    document.getElementById('newBtn').addEventListener('click', openModal);
+
+    document.getElementById('cancelBtn').addEventListener('click', function() { closeModal(false); });
+
+    document.getElementById('modalCloseX').addEventListener('click', function() { closeModal(false); });
+
+    document.getElementById('closeResult').addEventListener('click', function() { closeModal(true); });
 
     overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) {
-        overlay.style.opacity = '0';
-        overlay.style.pointerEvents = 'none';
-      }
+      if (e.target === overlay) closeModal(false);
     });
 
     var createdPixelHtml = '';

@@ -21,9 +21,9 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
 
   // -- Header actions: back link + delete button --
   const headerActions = `
-    <a href="/" class="btn btn-secondary" style="text-decoration:none;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-      Back
+    <a href="/" class="btn btn-secondary" style="text-decoration:none;font-size:12px;color:var(--text-muted);transition:color 0.15s ease;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      Dashboard
     </a>
     <button class="btn btn-danger" id="deleteBtn">Delete</button>`;
 
@@ -74,7 +74,7 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
       </div>` : '';
 
     sequenceHtml = `
-      <div class="panel" style="margin-bottom:16px;">
+      <div class="panel sequence-callout" style="margin-bottom:16px;">
         <div class="panel-title" style="display:flex;align-items:center;gap:8px;">
           Sequence ${renderBadge(esc(sequenceInfo.status), statusVariant)}
         </div>
@@ -100,9 +100,9 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
     <div class="panel">
       <div class="panel-title">Pixel Snippet</div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">HTML (click to copy)</div>
-      <div class="input" id="snippetHtml" style="font-family:monospace;font-size:11px;word-break:break-all;user-select:all;cursor:pointer;padding:10px;margin-bottom:10px;"></div>
+      <div class="input snippet-box" id="snippetHtml" style="font-family:monospace;font-size:11px;word-break:break-all;user-select:all;cursor:pointer;padding:10px;margin-bottom:10px;"></div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">URL (click to copy)</div>
-      <div class="input" id="snippetUrl" style="font-family:monospace;font-size:11px;word-break:break-all;user-select:all;cursor:pointer;padding:10px;"></div>
+      <div class="input snippet-box" id="snippetUrl" style="font-family:monospace;font-size:11px;word-break:break-all;user-select:all;cursor:pointer;padding:10px;"></div>
     </div>`;
 
   // -- Two-column layout --
@@ -122,8 +122,8 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
                 <button class="filter-tab" id="tabFiltered">Filtered</button>
               </div>
             </div>
-            <div id="opensTab"></div>
-            <div id="filteredTab" style="display:none"></div>
+            <div id="opensTab" class="detail-event-list"></div>
+            <div id="filteredTab" class="detail-event-list" style="display:none"></div>
           </div>
         </div>
         <div class="col-right" style="display:flex;flex-direction:column;gap:16px;">
@@ -152,21 +152,21 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
     <style>
       .cal-grid { display: flex; gap: 3px; }
       .cal-week { display: flex; flex-direction: column; gap: 3px; }
-      .cal-cell { width: 13px; height: 13px; border-radius: 2px; background: var(--bg-hover); cursor: default; position: relative; }
+      .cal-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--bg-hover); cursor: default; position: relative; transition: transform 0.1s ease, box-shadow 0.1s ease; }
       .cal-cell.l1 { background: rgba(59,130,246,0.2); }
       .cal-cell.l2 { background: rgba(59,130,246,0.4); }
       .cal-cell.l3 { background: rgba(59,130,246,0.6); }
       .cal-cell.l4 { background: var(--accent); }
-      .cal-cell:hover { outline: 1px solid var(--text-muted); outline-offset: -1px; }
+      .cal-cell:hover { transform: scale(1.3); z-index: 2; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
       .cal-months { display: flex; gap: 0; margin-bottom: 4px; }
       .cal-months span { font-size: 9px; color: var(--text-muted); }
-      .cal-legend-cell { width: 11px; height: 11px; border-radius: 2px; }
+      .cal-legend-cell { width: 11px; height: 11px; border-radius: 3px; }
       .cal-tooltip { position: fixed; padding: 4px 8px; border-radius: 4px; background: var(--text-primary); color: var(--bg-base); font-size: 11px; pointer-events: none; z-index: 100; white-space: nowrap; opacity: 0; transition: opacity 0.1s; }
 
       .time-grid { display: flex; flex-direction: column; gap: 10px; }
       .time-row-label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; letter-spacing: 0.04em; }
       .time-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
-      .time-cell { aspect-ratio: 1; border-radius: 4px; background: var(--bg-hover); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: default; transition: transform 0.15s, box-shadow 0.15s; position: relative; }
+      .time-cell { aspect-ratio: 1; border-radius: var(--radius-btn); background: var(--bg-hover); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: default; transition: transform 0.15s ease, box-shadow 0.15s ease; position: relative; }
       .time-cell:hover { transform: scale(1.15); z-index: 2; box-shadow: 0 0 12px rgba(0,0,0,0.5); }
       .time-cell .tc-hour { font-size: 8px; color: var(--text-muted); font-weight: 500; line-height: 1; }
       .time-cell .tc-count { font-size: 10px; font-weight: 700; color: var(--text-primary); line-height: 1; margin-top: 2px; }
@@ -186,12 +186,27 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
       .event-row .event-dot.open { background: var(--accent); }
       .event-row .event-dot.filtered { background: var(--warning); }
 
-      .empty-state { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 12px; }
+      .detail-event-list .event-row:nth-child(even) {
+        background: rgba(148,163,184,0.03);
+        border-radius: var(--radius-btn);
+      }
 
-      @media (max-width: 768px) {
+      .snippet-box {
+        transition: background 0.2s ease;
+      }
+      .snippet-box.copied-flash {
+        background: rgba(34,197,94,0.15);
+      }
+
+      @media (max-width: 900px) {
         .two-col { flex-direction: column; }
+      }
+      @media (max-width: 768px) {
         .stat-grid { flex-wrap: wrap; }
         .stat-grid .stat-card { min-width: calc(50% - 8px); }
+      }
+      @media (max-width: 480px) {
+        .stat-grid .stat-card { min-width: 100%; }
       }
     </style>`;
 
@@ -274,21 +289,22 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
     var pixelHtmlStr = '<img src="' + base + '/t/' + DATA.id + '" width="1" height="1" style="display:none" />';
     var pixelUrlStr = base + '/t/' + DATA.id;
     var snippetHtml = document.getElementById('snippetHtml');
-    snippetHtml.textContent = pixelHtmlStr;
-    snippetHtml.addEventListener('click', function() {
-      navigator.clipboard.writeText(pixelHtmlStr).then(function() {
-        snippetHtml.textContent = 'Copied!';
-        setTimeout(function() { snippetHtml.textContent = pixelHtmlStr; }, 1500);
+    function flashCopied(el, originalText) {
+      navigator.clipboard.writeText(originalText).then(function() {
+        el.textContent = 'Copied!';
+        el.classList.add('copied-flash');
+        setTimeout(function() {
+          el.textContent = originalText;
+          el.classList.remove('copied-flash');
+        }, 1500);
       });
-    });
+    }
+
+    snippetHtml.textContent = pixelHtmlStr;
+    snippetHtml.addEventListener('click', function() { flashCopied(snippetHtml, pixelHtmlStr); });
     var snippetUrl = document.getElementById('snippetUrl');
     snippetUrl.textContent = pixelUrlStr;
-    snippetUrl.addEventListener('click', function() {
-      navigator.clipboard.writeText(pixelUrlStr).then(function() {
-        snippetUrl.textContent = 'Copied!';
-        setTimeout(function() { snippetUrl.textContent = pixelUrlStr; }, 1500);
-      });
-    });
+    snippetUrl.addEventListener('click', function() { flashCopied(snippetUrl, pixelUrlStr); });
 
     // Peak Hours (local timezone)
     var localHourly = new Array(24).fill(0);
