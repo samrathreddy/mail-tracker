@@ -219,7 +219,7 @@ export function renderAnalyticsPage(analyticsData, templates, oauthConnected, da
           const widthPct = Math.max((s.sent / maxSent) * 100, 5);
           const openRate = (s.openRate * 100).toFixed(0);
           return `<div class="funnel-bar-row">
-          <span style="color:var(--text-secondary);font-size:12px;width:50px;flex-shrink:0;">Step ${i + 1}</span>
+          <span style="color:var(--text-secondary);font-size:12px;width:60px;flex-shrink:0;">${i === 0 && s.sent === 0 ? 'Original' : 'Step ' + (i + 1)}</span>
           <div class="funnel-bar" style="width:${widthPct}%;">
             <span style="color:var(--accent-light);font-size:12px;">${esc(String(s.sent))} sent</span>
             <div class="funnel-tooltip">${esc(String(s.sent))} sent, ${esc(String(s.opened))} opened (${esc(openRate)}%)</div>
@@ -234,7 +234,7 @@ export function renderAnalyticsPage(analyticsData, templates, oauthConnected, da
           const openRate = (s.openRate * 100).toFixed(0);
           const replyRate = (s.replyRate * 100).toFixed(0);
           return `<tr>
-          <td>Step ${i + 1}</td>
+          <td>${i === 0 && s.sent === 0 ? 'Original' : 'Step ' + (i + 1)}</td>
           <td>${esc(String(s.sent))}</td>
           <td>${esc(String(s.opened))}</td>
           <td>${esc(openRate)}%</td>
@@ -484,7 +484,7 @@ function buildClientScripts(analyticsData, templateNames, dailyDataMap) {
         label.style.fontSize = '12px';
         label.style.width = '50px';
         label.style.flexShrink = '0';
-        label.textContent = 'Step ' + (i + 1);
+        label.textContent = (i === 0 && steps[i].sent === 0) ? 'Original' : 'Step ' + (i + 1);
         var bar = document.createElement('div');
         bar.className = 'funnel-bar';
         bar.style.width = widthPct + '%';

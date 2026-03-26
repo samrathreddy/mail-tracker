@@ -439,12 +439,21 @@ export async function recordOpenForAnalytics(env, trackerId) {
   if (!seqId) return;
 
   const seq = await env.SEQUENCES.get(seqId, 'json');
-  if (!seq) return;
+  if (!seq || !seq.templateId) return;
 
+  // Find the most recently sent step and attribute the open to it
+  let attributed = false;
   for (let i = seq.steps.length - 1; i >= 0; i--) {
     if (seq.steps[i].status === 'sent') {
       await updateAnalytics(env, seq.templateId, i, 'opened');
+      attributed = true;
       break;
     }
+  }
+
+  // If no steps sent yet, this is an open on the original email.
+  // Record it at step 0 so analytics show data before follow-ups fire.
+  if (!attributed) {
+    await updateAnalytics(env, seq.templateId, 0, 'opened');
   }
 }

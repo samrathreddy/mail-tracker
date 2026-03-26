@@ -226,6 +226,25 @@ export async function createSequence(env, data) {
   // Create reverse index: tracker -> sequence
   await env.SEQUENCES.put(`tracker-seq:${data.trackerId}`, id);
 
+  // Initialize analytics entry for this template so data shows immediately
+  if (templateId) {
+    const analyticsKey = `analytics:${templateId}`;
+    let analytics = await env.SEQUENCES.get(analyticsKey, 'json');
+    if (!analytics) {
+      analytics = {
+        templateId,
+        totalSequences: 0,
+        completedSequences: 0,
+        stoppedSequences: 0,
+        steps: [],
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    analytics.totalSequences++;
+    analytics.updatedAt = new Date().toISOString();
+    await env.SEQUENCES.put(analyticsKey, JSON.stringify(analytics));
+  }
+
   return { sequence };
 }
 
