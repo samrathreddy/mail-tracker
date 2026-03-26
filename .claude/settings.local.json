@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /Users/beckett/Projects/github_clones/mail-tracker -type f -name wrangler*.toml)"
+      "Bash(find /Users/beckett/Projects/github_clones/mail-tracker -type f -name wrangler*.toml)",
+      "Bash(node:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(timeout 5 pnpm dev)",
+      "Bash(git log:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Bash(done)"
     ]
   }
 }

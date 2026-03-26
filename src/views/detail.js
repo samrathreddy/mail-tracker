@@ -161,9 +161,15 @@ export function renderDetail(id, data, sequenceInfo) {
         <div style="font-size:13px;color:var(--text-2);">
           ${sequenceInfo.steps.map((s, i) => {
             const icon = s.status === 'sent' ? 'Sent' : s.status === 'pending' ? 'Pending' : s.status === 'skipped' ? 'Skipped' : s.status === 'failed' ? 'Failed' : '-';
-            return '<div style="padding:4px 0;">[' + esc(icon) + '] Step ' + (i + 1) + ': Day ' + s.delayDays + ' - ' + esc(s.subject.substring(0, 60)) + (s.sentAt ? ' (sent ' + esc(new Date(s.sentAt).toLocaleString()) + ')' : '') + '</div>';
+            return '<div style="padding:4px 0;">[' + esc(icon) + '] Step ' + (i + 1) + ': Day ' + s.delayDays + ' - ' + esc(s.subject.substring(0, 60)) + (s.sentAt ? ' (sent ' + esc(new Date(s.sentAt).toLocaleString('en-US', { timeZone: sequenceInfo.timezone })) + ')' : '') + '</div>';
           }).join('')}
         </div>
+        ${sequenceInfo.status === 'active' ? `
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button onclick="if(confirm('Cancel sequence?'))fetch('/sequences/${esc(sequenceInfo.id)}',{method:'DELETE'}).then(()=>location.reload())" style="background:#ef4444;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;">Cancel Sequence</button>
+            <button onclick="if(confirm('Skip current step?'))fetch('/sequences/${esc(sequenceInfo.id)}/skip',{method:'POST'}).then(()=>location.reload())" style="background:#3b82f6;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;">Skip Step</button>
+          </div>
+        ` : ''}
       </div>
     ` : ''}
 
@@ -179,19 +185,20 @@ export function renderDetail(id, data, sequenceInfo) {
   </div>
 
   <script>
+    function safeJson(v) { return JSON.stringify(v).replace(/</g, '\\u003c'); }
     var DATA = {
-      id: ${JSON.stringify(id)},
-      recipient: ${JSON.stringify(recipient)},
-      subject: ${JSON.stringify(data.subject || '')},
-      opens: ${JSON.stringify(data.opens || 0)},
-      skipped: ${JSON.stringify(data.skipped || 0)},
-      hasSenderIp: ${JSON.stringify(!!data.senderIp)},
-      createdAt: ${JSON.stringify(data.createdAt || null)},
-      firstOpen: ${JSON.stringify(firstOpen)},
-      lastOpen: ${JSON.stringify(lastOpenTime)},
-      uniqueIps: ${JSON.stringify(uniqueIps)},
-      events: ${JSON.stringify(events)},
-      filtered: ${JSON.stringify(filteredEvents)},
+      id: ${JSON.stringify(id).replace(/</g, '\\u003c')},
+      recipient: ${JSON.stringify(recipient).replace(/</g, '\\u003c')},
+      subject: ${JSON.stringify(data.subject || '').replace(/</g, '\\u003c')},
+      opens: ${JSON.stringify(data.opens || 0).replace(/</g, '\\u003c')},
+      skipped: ${JSON.stringify(data.skipped || 0).replace(/</g, '\\u003c')},
+      hasSenderIp: ${JSON.stringify(!!data.senderIp).replace(/</g, '\\u003c')},
+      createdAt: ${JSON.stringify(data.createdAt || null).replace(/</g, '\\u003c')},
+      firstOpen: ${JSON.stringify(firstOpen).replace(/</g, '\\u003c')},
+      lastOpen: ${JSON.stringify(lastOpenTime).replace(/</g, '\\u003c')},
+      uniqueIps: ${JSON.stringify(uniqueIps).replace(/</g, '\\u003c')},
+      events: ${JSON.stringify(events).replace(/</g, '\\u003c')},
+      filtered: ${JSON.stringify(filteredEvents).replace(/</g, '\\u003c')},
       dailyOpens: {}
     };
 

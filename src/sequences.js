@@ -1,5 +1,3 @@
-import { substituteVariables } from './variables.js';
-
 function generateId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map(b => b.toString(16).padStart(2, '0'))
@@ -7,79 +5,96 @@ function generateId() {
 }
 
 /**
+ * Parse formatted date parts from Intl.DateTimeFormat into an object
+ * with numeric values for year, month (0-based), day, hour, minute, second.
+ */
+function parseTzParts(formatter, date) {
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map(p => [p.type, p.value])
+  );
+  return {
+    year: parseInt(parts.year),
+    month: parseInt(parts.month) - 1,
+    day: parseInt(parts.day),
+    hour: parseInt(parts.hour === '24' ? '0' : parts.hour),
+    minute: parseInt(parts.minute),
+    second: parseInt(parts.second),
+  };
+}
+
+/**
+ * Find the UTC offset (in ms) for a given timezone at a given UTC instant,
+ * accounting for sub-hour offsets (e.g. IST +5:30, Nepal +5:45) and DST.
+ */
+function getUtcOffsetMs(formatter, utcDate) {
+  const local = parseTzParts(formatter, utcDate);
+  // Build a UTC date from the local-looking components
+  const localAsUtc = Date.UTC(local.year, local.month, local.day, local.hour, local.minute, local.second);
+  // The difference tells us the offset: local = utc + offset => offset = localAsUtc - utcDate
+  return localAsUtc - utcDate.getTime();
+}
+
+/**
  * Compute scheduledAt for a step, respecting timezone and 8am-6pm send window.
  * delayDays is relative to the original email send time.
+ * Handles sub-hour offsets (IST +5:30, Nepal +5:45) and DST boundaries correctly.
  */
 export function computeScheduledAt(createdAt, delayDays, timezone) {
   const tz = timezone || 'UTC';
   const origin = new Date(createdAt);
 
-  // Get the date components in the target timezone
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false,
   });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(origin).map(p => [p.type, p.value])
+
+  // Get the origin time in the target timezone
+  const originLocal = parseTzParts(formatter, origin);
+
+  // Compute the target local date by adding delayDays
+  // Use Date.UTC to handle month/day overflow correctly
+  const targetLocalMs = Date.UTC(
+    originLocal.year, originLocal.month, originLocal.day + delayDays,
+    originLocal.hour, originLocal.minute, originLocal.second
   );
 
-  // Build a date in the target timezone
-  const localYear = parseInt(parts.year);
-  const localMonth = parseInt(parts.month) - 1;
-  const localDay = parseInt(parts.day);
-  const localHour = parseInt(parts.hour);
-  const localMinute = parseInt(parts.minute);
-
-  // Add delayDays to the local date
-  const targetDay = localDay + delayDays;
-
-  // Create a reference UTC date to find the timezone offset
-  const refDate = new Date(Date.UTC(localYear, localMonth, targetDay, localHour, localMinute));
-
-  // Find what this time looks like in the target timezone
-  const targetParts = Object.fromEntries(
-    formatter.formatToParts(refDate).map(p => [p.type, p.value])
-  );
-  const actualLocalHour = parseInt(targetParts.hour);
-  const actualLocalDay = parseInt(targetParts.day);
-  const actualLocalMonth = parseInt(targetParts.month) - 1;
-  const actualLocalYear = parseInt(targetParts.year);
+  let sendYear = new Date(targetLocalMs).getUTCFullYear();
+  let sendMonth = new Date(targetLocalMs).getUTCMonth();
+  let sendDay = new Date(targetLocalMs).getUTCDate();
+  let sendHour = new Date(targetLocalMs).getUTCHours();
+  let sendMinute = new Date(targetLocalMs).getUTCMinutes();
 
   // Clamp to 8am-6pm send window in target timezone
-  let sendHour = actualLocalHour;
-  let sendMinute = parseInt(targetParts.minute);
-  let addDays = 0;
-
   if (sendHour < 8) {
-    // Before window: snap to 9am same day
     sendHour = 9;
     sendMinute = 0;
   } else if (sendHour >= 18) {
-    // After window: snap to 9am next day
+    // Snap to 9am next day
+    const nextDay = new Date(Date.UTC(sendYear, sendMonth, sendDay + 1, 9, 0, 0));
+    sendYear = nextDay.getUTCFullYear();
+    sendMonth = nextDay.getUTCMonth();
+    sendDay = nextDay.getUTCDate();
     sendHour = 9;
     sendMinute = 0;
-    addDays = 1;
   }
 
-  // Reconstruct the final date
-  const approxUtc = new Date(Date.UTC(
-    actualLocalYear, actualLocalMonth, actualLocalDay + addDays,
-    sendHour, sendMinute, 0
-  ));
+  // We now have the desired local time; find the corresponding UTC time.
+  // Start with a candidate: desired_local_as_utc - estimated_offset
+  // Use iterative approach to converge on the correct UTC timestamp.
+  const desiredLocalMs = Date.UTC(sendYear, sendMonth, sendDay, sendHour, sendMinute, 0);
 
-  // Find the actual offset by checking what time approxUtc is in the target TZ
-  const checkParts = Object.fromEntries(
-    formatter.formatToParts(approxUtc).map(p => [p.type, p.value])
-  );
-  const checkHour = parseInt(checkParts.hour);
-  const hourDiff = checkHour - sendHour;
+  // First estimate: use the offset at the origin as a starting point
+  let candidateUtc = new Date(desiredLocalMs - getUtcOffsetMs(formatter, origin));
 
-  // Adjust for timezone offset
-  const finalUtc = new Date(approxUtc.getTime() - hourDiff * 3600000);
+  // Refine: check what local time this candidate actually produces, and adjust
+  for (let i = 0; i < 3; i++) {
+    const actualOffset = getUtcOffsetMs(formatter, candidateUtc);
+    candidateUtc = new Date(desiredLocalMs - actualOffset);
+  }
 
-  return finalUtc.toISOString();
+  return candidateUtc.toISOString();
 }
 
 /**
@@ -140,9 +155,13 @@ export async function createSequence(env, data) {
     steps = data.steps;
   }
 
-  // Check active sequence limit
-  const activeKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
-  if (activeKeys.keys.length >= 500) {
+  // Check active sequence limit (only count sequences with status === 'active')
+  const allSeqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+  const allSeqs = await Promise.all(
+    allSeqKeys.keys.map(k => env.SEQUENCES.get(k.name, 'json'))
+  );
+  const activeCount = allSeqs.filter(s => s && s.status === 'active').length;
+  if (activeCount >= 500) {
     return { error: 'Maximum 500 active sequences reached' };
   }
 

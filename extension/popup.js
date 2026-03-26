@@ -12,7 +12,7 @@ const pixelContainer = document.getElementById('pixel-container');
 const toastEl = document.getElementById('toast');
 
 // --- Sanitization ---
-function esc(str) {
+function _esc(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -91,7 +91,7 @@ async function api(path) {
   } catch (err) {
     clearTimeout(timeoutId);
     if (err.name === 'AbortError') {
-      throw new Error('Request timeout - check your password');
+      throw new Error('Request timeout - check your password', { cause: err });
     }
     throw err;
   }
@@ -116,6 +116,8 @@ async function showSetup(isFirst) {
   // Save to temp storage on blur (when field loses focus)
   serverInput.onblur = () => chrome.storage.local.set({ tempServerUrl: serverInput.value });
   passwordInput.onblur = () => chrome.storage.local.set({ tempPassword: passwordInput.value });
+
+  checkOAuthStatus();
 }
 
 function showList() {
@@ -465,8 +467,76 @@ async function loadSequencesView() {
 
       var progress = document.createElement('div');
       progress.style.cssText = 'color:#a1a1aa;font-size:12px;margin-top:4px;';
-      progress.textContent = 'Step ' + seq.currentStep + '/' + seq.steps.length;
+      progress.textContent = 'Step ' + (seq.currentStep + 1) + '/' + seq.steps.length;
       card.appendChild(progress);
+
+      // Show next send time for active sequences
+      if (seq.status === 'active' && seq.steps && seq.steps[seq.currentStep]) {
+        var nextStep = seq.steps[seq.currentStep];
+        if (nextStep.scheduledAt) {
+          var nextTime = document.createElement('div');
+          nextTime.style.cssText = 'color:#818cf8;font-size:11px;margin-top:2px;';
+          var scheduledDate = new Date(nextStep.scheduledAt);
+          var now = Date.now();
+          var diffMs = scheduledDate.getTime() - now;
+          if (diffMs <= 0) {
+            nextTime.textContent = 'Sending soon';
+          } else if (diffMs < 3600000) {
+            nextTime.textContent = 'Next in ' + Math.ceil(diffMs / 60000) + 'm';
+          } else if (diffMs < 86400000) {
+            nextTime.textContent = 'Next in ' + Math.ceil(diffMs / 3600000) + 'h';
+          } else {
+            nextTime.textContent = 'Next: ' + scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+          }
+          card.appendChild(nextTime);
+        }
+      }
+
+      // Click-to-expand step timeline
+      var timeline = document.createElement('div');
+      timeline.style.cssText = 'display:none;margin-top:8px;border-top:1px solid #3f3f46;padding-top:8px;';
+      seq.steps.forEach(function(step, si) {
+        var stepRow = document.createElement('div');
+        stepRow.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;';
+
+        var dot = document.createElement('span');
+        if (step.sentAt) {
+          dot.style.cssText = 'color:#22c55e;';
+          dot.textContent = '\u2713';
+        } else if (si === seq.currentStep && seq.status === 'active') {
+          dot.style.cssText = 'color:#818cf8;';
+          dot.textContent = '\u25CF';
+        } else {
+          dot.style.cssText = 'color:#52525b;';
+          dot.textContent = '\u25CB';
+        }
+        stepRow.appendChild(dot);
+
+        var stepLabel = document.createElement('span');
+        stepLabel.style.cssText = 'color:#a1a1aa;';
+        stepLabel.textContent = 'Step ' + (si + 1) + ' (Day ' + (step.delayDays || '?') + ')';
+        stepRow.appendChild(stepLabel);
+
+        var stepStatus = document.createElement('span');
+        stepStatus.style.cssText = 'margin-left:auto;color:#71717a;font-size:10px;';
+        if (step.sentAt) {
+          stepStatus.textContent = 'Sent ' + timeAgo(step.sentAt);
+        } else if (step.scheduledAt) {
+          stepStatus.textContent = 'Scheduled ' + new Date(step.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else {
+          stepStatus.textContent = 'Pending';
+        }
+        stepRow.appendChild(stepStatus);
+
+        timeline.appendChild(stepRow);
+      });
+      card.appendChild(timeline);
+
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        timeline.style.display = timeline.style.display === 'none' ? 'block' : 'none';
+      });
 
       if (seq.status === 'active') {
         var actions = document.createElement('div');
@@ -503,7 +573,7 @@ async function loadSequencesView() {
 
       container.appendChild(card);
     });
-  } catch (e) {
+  } catch (_e) {
     container.textContent = '';
     var err = document.createElement('div');
     err.style.cssText = 'text-align:center;color:#ef4444;padding:20px;';
@@ -523,6 +593,14 @@ async function loadTemplatesView() {
   try {
     var templates = await api('/templates');
     container.textContent = '';
+
+    var createBtn = document.createElement('button');
+    createBtn.style.cssText = 'background:#6366f1;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;margin-bottom:12px;width:100%;';
+    createBtn.textContent = '+ Create Template (opens dashboard)';
+    createBtn.addEventListener('click', function() {
+      chrome.tabs.create({ url: serverUrl + '/templates' });
+    });
+    container.appendChild(createBtn);
 
     if (templates.length === 0) {
       var empty = document.createElement('div');
@@ -555,7 +633,7 @@ async function loadTemplatesView() {
 
       container.appendChild(card);
     });
-  } catch (e) {
+  } catch (_e) {
     container.textContent = '';
     var err = document.createElement('div');
     err.style.cssText = 'text-align:center;color:#ef4444;padding:20px;';

@@ -80,6 +80,16 @@ export async function handleOAuthCallback(env, code, state, redirectUri) {
   // Clear any previous error
   await env.SEQUENCES.delete('oauth:error');
 
+  // Re-activate any sequences that were paused due to OAuth issues
+  const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+  for (const key of seqKeys.keys) {
+    const seq = await env.SEQUENCES.get(key.name, 'json');
+    if (seq && seq.status === 'paused') {
+      seq.status = 'active';
+      await env.SEQUENCES.put(key.name, JSON.stringify(seq));
+    }
+  }
+
   return { success: true, email: oauthData.email };
 }
 
@@ -152,19 +162,32 @@ export async function disconnectOAuth(env) {
 }
 
 /**
+ * Strip \r and \n from a header value to prevent header injection.
+ */
+function sanitizeHeader(value) {
+  return String(value).replace(/[\r\n]/g, '');
+}
+
+/**
  * Build an RFC 2822 MIME message and base64url encode it.
  */
-function buildMimeMessage({ to, subject, body, inReplyTo, references }) {
-  const lines = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
+function buildMimeMessage({ to, subject, body, from, inReplyTo, references }) {
+  const lines = [];
+
+  if (from) {
+    lines.push(`From: ${sanitizeHeader(from)}`);
+  }
+
+  lines.push(
+    `To: ${sanitizeHeader(to)}`,
+    `Subject: ${sanitizeHeader(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
-  ];
+  );
 
   if (inReplyTo) {
-    lines.push(`In-Reply-To: ${inReplyTo}`);
-    lines.push(`References: ${references || inReplyTo}`);
+    lines.push(`In-Reply-To: ${sanitizeHeader(inReplyTo)}`);
+    lines.push(`References: ${sanitizeHeader(references || inReplyTo)}`);
   }
 
   lines.push('', body);
@@ -188,10 +211,15 @@ export async function sendFollowUp(env, { to, subject, body, threadId, inReplyTo
   const { token, error } = await getAccessToken(env);
   if (error) return { error, status: 401 };
 
+  // Read the authenticated user's email for the From header
+  const tokenData = await env.SEQUENCES.get('oauth:tokens', 'json');
+  const fromEmail = tokenData?.email || null;
+
   const raw = buildMimeMessage({
     to,
     subject,
     body,
+    from: fromEmail,
     inReplyTo,
     references: inReplyTo,
   });

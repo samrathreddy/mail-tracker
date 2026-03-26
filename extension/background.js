@@ -1,6 +1,6 @@
 // Background service worker — polls for new opens and sends notifications
 
-const POLL_INTERVAL = 300_000; // 5 minutes
+// Poll interval: 5 minutes (configured via chrome.alarms below)
 
 async function getServerUrl() {
   const { serverUrl, dashboardPassword } = await chrome.storage.sync.get(['serverUrl', 'dashboardPassword']);
@@ -22,14 +22,11 @@ async function pollForOpens() {
 
     const { lastKnownOpens = {} } = await chrome.storage.local.get('lastKnownOpens');
     const updated = {};
-    let hasChanges = false;
-
     for (const pixel of pixels) {
       const prev = lastKnownOpens[pixel.id] || 0;
       updated[pixel.id] = pixel.opens;
 
       if (prev > 0 && pixel.opens > prev) {
-        hasChanges = true;
         const diff = pixel.opens - prev;
         const who = pixel.recipient || pixel.id;
         chrome.notifications.create(`open-${pixel.id}-${Date.now()}`, {
@@ -42,7 +39,7 @@ async function pollForOpens() {
     }
 
     await chrome.storage.local.set({ lastKnownOpens: updated });
-  } catch (e) {
+  } catch (_e) {
     // Server unreachable — silently ignore
   }
 }

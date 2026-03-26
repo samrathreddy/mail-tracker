@@ -102,9 +102,9 @@ export function renderDashboard(results, totalOpens, activeCount) {
     </div>
   </div>
   <script>
-    var DATA = ${JSON.stringify(results)};
-    var TOTAL_OPENS = ${JSON.stringify(totalOpens)};
-    var ACTIVE_COUNT = ${JSON.stringify(activeCount)};
+    var DATA = ${JSON.stringify(results).replace(/</g, '\\u003c')};
+    var TOTAL_OPENS = ${JSON.stringify(totalOpens).replace(/</g, '\\u003c')};
+    var ACTIVE_COUNT = ${JSON.stringify(activeCount).replace(/</g, '\\u003c')};
     document.getElementById('totalTrackers').textContent = DATA.length;
     document.getElementById('totalOpens').textContent = TOTAL_OPENS;
     document.getElementById('activeCount').textContent = ACTIVE_COUNT;
@@ -138,6 +138,13 @@ export function renderDashboard(results, totalOpens, activeCount) {
         var nd = document.createElement('div'); nd.className = 'num'; nd.textContent = r.opens;
         var ld = document.createElement('div'); ld.className = 'label'; ld.textContent = r.opens === 1 ? 'open' : 'opens';
         cd.appendChild(nd); cd.appendChild(ld); right.appendChild(cd);
+        if (r.sequenceProgress) {
+          var seqBadge = document.createElement('span');
+          seqBadge.className = 'badge-sm';
+          seqBadge.style.cssText = 'background:rgba(99,102,241,0.12);color:#818cf8;';
+          seqBadge.textContent = r.sequenceProgress;
+          right.appendChild(seqBadge);
+        }
         var arrow = document.createElement('div'); arrow.className = 'card-arrow'; arrow.textContent = '\\u203A'; arrow.style.fontSize = '1.5rem'; right.appendChild(arrow);
         card.appendChild(left); card.appendChild(right); cardList.appendChild(card);
       });

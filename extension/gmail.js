@@ -255,7 +255,7 @@
     
     return null;
   }
-  function addReadIndicators(composeForm) {
+  function _addReadIndicators(composeForm) {
     console.log(LOG, 'Adding read indicators...');
     
     // Find all recipient chips in the compose form
@@ -321,28 +321,46 @@
     const seqBtn = form.querySelector('[data-sequence-selector] button');
     if (seqBtn) {
       const templateId = seqBtn.getAttribute('data-selected-template');
-      if (templateId) {
+      const oneoffSteps = seqBtn.getAttribute('data-oneoff-steps');
+      if (templateId || oneoffSteps) {
         const { subject, bodyPreview } = getEmailContent(form);
         const allRecipients = getRecipients(form);
         for (const recipient of allRecipients) {
           const img = bodyEl.querySelector('img[data-mail-tracker-to="' + recipient + '"]');
           const trackerId = img ? new URL(img.src).pathname.split('/t/')[1] : null;
+          const messageIdAttr = img ? img.getAttribute('data-message-id') : null;
           if (trackerId) {
             try {
               const headers = { 'Content-Type': 'application/json' };
               if (dashboardPassword) {
                 headers['Authorization'] = 'Basic ' + btoa(':' + dashboardPassword);
               }
-              await fetch(serverUrl + '/sequences', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify({
+              var seqBody;
+              if (templateId) {
+                seqBody = JSON.stringify({
                   templateId: templateId,
                   trackerId: trackerId,
                   recipient: recipient,
+                  originalMessageId: messageIdAttr || null,
+                  threadId: null,
                   variables: { subject: subject, originalBody: bodyPreview },
                   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                }),
+                });
+              } else {
+                seqBody = JSON.stringify({
+                  steps: JSON.parse(oneoffSteps),
+                  trackerId: trackerId,
+                  recipient: recipient,
+                  originalMessageId: messageIdAttr || null,
+                  threadId: null,
+                  variables: { subject: subject, originalBody: bodyPreview },
+                  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                });
+              }
+              await fetch(serverUrl + '/sequences', {
+                method: 'POST',
+                headers: headers,
+                body: seqBody,
               });
             } catch (e) {
               console.error(LOG, 'Failed to create sequence', e);
@@ -382,11 +400,6 @@
           const form = findComposeForm(body);
           if (!form) continue;
 
-          // Inject sequence selector
-          if (trackingEnabled) {
-            injectSequenceSelector(form);
-          }
-
           const recipients = getRecipients(form);
           const untracked = getUntrackedRecipients(body, recipients);
           
@@ -411,7 +424,7 @@
   }
 
   // Periodically update read indicators for open compose windows
-  function startStatusUpdater() {
+  function _startStatusUpdater() {
     // No periodic updates - only fetch on view changes
   }
 
@@ -487,6 +500,9 @@
     });
   }
 
+  // Global flag for dropdown close listener (H9: prevent listener leak)
+  let globalDropdownListenerAdded = false;
+
   // Sequence selector functions
   async function getTemplates() {
     if (!serverUrl) return [];
@@ -558,6 +574,7 @@
       noSeq.addEventListener('click', function() {
         labelSpan.textContent = 'No sequence';
         btn.setAttribute('data-selected-template', '');
+        btn.setAttribute('data-oneoff-steps', '');
         dropdown.style.display = 'none';
       });
       noSeq.addEventListener('mouseenter', function() { noSeq.style.background = '#3f3f46'; });
@@ -581,6 +598,7 @@
           item.addEventListener('click', function() {
             labelSpan.textContent = tmpl.name;
             btn.setAttribute('data-selected-template', tmpl.id);
+            btn.setAttribute('data-oneoff-steps', '');
             dropdown.style.display = 'none';
           });
           item.addEventListener('mouseenter', function() { item.style.background = '#3f3f46'; });
@@ -588,15 +606,128 @@
           dropdown.appendChild(item);
         });
       }
+
+      // One-off follow-up option
+      const divider2 = document.createElement('div');
+      divider2.style.cssText = 'border-top:1px solid #3f3f46;margin:4px 0;';
+      dropdown.appendChild(divider2);
+
+      const oneOff = document.createElement('div');
+      oneOff.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;color:#a5b4fc;';
+      oneOff.textContent = '+ One-off follow-up...';
+      oneOff.addEventListener('mouseenter', function() { oneOff.style.background = '#3f3f46'; });
+      oneOff.addEventListener('mouseleave', function() { oneOff.style.background = 'none'; });
+      oneOff.addEventListener('click', function() {
+        dropdown.style.display = 'none';
+        showOneOffBuilder(container, btn, labelSpan);
+      });
+      dropdown.appendChild(oneOff);
     });
 
-    document.addEventListener('click', function(e) {
-      if (!container.contains(e.target)) dropdown.style.display = 'none';
-    });
+    if (!globalDropdownListenerAdded) {
+      document.addEventListener('click', function(e) {
+        document.querySelectorAll('[data-sequence-selector]').forEach(function(sel) {
+          if (!sel.contains(e.target)) {
+            var dd = sel.querySelector('div[style*="position:absolute"]');
+            if (dd) dd.style.display = 'none';
+          }
+        });
+      });
+      globalDropdownListenerAdded = true;
+    }
 
     container.appendChild(btn);
     container.appendChild(dropdown);
     sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
+  }
+
+  function showOneOffBuilder(container, btn, labelSpan) {
+    var existing = container.parentElement.querySelector('.oneoff-builder');
+    if (existing) existing.remove();
+
+    var builder = document.createElement('div');
+    builder.className = 'oneoff-builder';
+    builder.style.cssText = 'background:#27272a;border:1px solid #52525b;border-radius:10px;padding:12px;margin-top:8px;font-size:12px;color:#e4e4e7;';
+
+    var title = document.createElement('div');
+    title.style.cssText = 'font-weight:600;margin-bottom:8px;';
+    title.textContent = 'One-off Follow-up';
+    builder.appendChild(title);
+
+    var delayLabel = document.createElement('label');
+    delayLabel.style.cssText = 'color:#a1a1aa;font-size:11px;';
+    delayLabel.textContent = 'Send after (days):';
+    builder.appendChild(delayLabel);
+    var delayInput = document.createElement('input');
+    delayInput.type = 'number';
+    delayInput.min = '1';
+    delayInput.max = '90';
+    delayInput.value = '2';
+    delayInput.style.cssText = 'background:#3f3f46;color:#e4e4e7;border:1px solid #52525b;border-radius:6px;padding:4px 8px;width:60px;margin:4px 0 8px;display:block;';
+    builder.appendChild(delayInput);
+
+    var subLabel = document.createElement('label');
+    subLabel.style.cssText = 'color:#a1a1aa;font-size:11px;';
+    subLabel.textContent = 'Subject:';
+    builder.appendChild(subLabel);
+    var subInput = document.createElement('input');
+    subInput.type = 'text';
+    subInput.placeholder = 'Re: {{subject}}';
+    subInput.style.cssText = 'background:#3f3f46;color:#e4e4e7;border:1px solid #52525b;border-radius:6px;padding:4px 8px;width:100%;margin:4px 0 8px;display:block;';
+    builder.appendChild(subInput);
+
+    var bodyLabel = document.createElement('label');
+    bodyLabel.style.cssText = 'color:#a1a1aa;font-size:11px;';
+    bodyLabel.textContent = 'Body:';
+    builder.appendChild(bodyLabel);
+    var bodyInput = document.createElement('textarea');
+    bodyInput.placeholder = 'Hi {{firstName}}, just following up...';
+    bodyInput.style.cssText = 'background:#3f3f46;color:#e4e4e7;border:1px solid #52525b;border-radius:6px;padding:4px 8px;width:100%;height:60px;margin:4px 0 8px;display:block;resize:vertical;';
+    builder.appendChild(bodyInput);
+
+    var stopDiv = document.createElement('div');
+    stopDiv.style.cssText = 'margin-bottom:8px;';
+    var replyCheck = document.createElement('input');
+    replyCheck.type = 'checkbox';
+    replyCheck.checked = true;
+    var replyLbl = document.createElement('label');
+    replyLbl.style.cssText = 'font-size:11px;color:#a1a1aa;';
+    replyLbl.appendChild(replyCheck);
+    replyLbl.appendChild(document.createTextNode(' Stop on reply'));
+    stopDiv.appendChild(replyLbl);
+    builder.appendChild(stopDiv);
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:6px;';
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.textContent = 'Set';
+    saveBtn.style.cssText = 'background:#22c55e;color:white;border:none;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;';
+    saveBtn.addEventListener('click', function() {
+      var stopOn = [];
+      if (replyCheck.checked) stopOn.push('reply');
+      var steps = JSON.stringify([{
+        delayDays: parseInt(delayInput.value) || 2,
+        subject: subInput.value || 'Re: {{subject}}',
+        body: bodyInput.value || '',
+        stopOn: stopOn,
+      }]);
+      btn.setAttribute('data-selected-template', '');
+      btn.setAttribute('data-oneoff-steps', steps);
+      labelSpan.textContent = 'One-off (' + (delayInput.value || '2') + 'd)';
+      builder.remove();
+    });
+    btnRow.appendChild(saveBtn);
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = 'background:#3f3f46;color:#a1a1aa;border:1px solid #52525b;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;';
+    cancelBtn.addEventListener('click', function() { builder.remove(); });
+    btnRow.appendChild(cancelBtn);
+    builder.appendChild(btnRow);
+
+    container.parentElement.insertBefore(builder, container.nextSibling);
   }
 
   // Initialize tracking
@@ -634,6 +765,15 @@
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         handleViewChange();
+      }
+
+      // C3: Inject sequence selector into compose windows as they appear
+      if (trackingEnabled) {
+        const composeBodies = findComposeBodies();
+        composeBodies.forEach(function(bodyEl) {
+          const form = findComposeForm(bodyEl);
+          if (form) injectSequenceSelector(form);
+        });
       }
     }, 1000);
   }

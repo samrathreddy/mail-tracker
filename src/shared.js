@@ -4,7 +4,7 @@ export const PIXEL = Uint8Array.from(atob(
 
 export const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -44,7 +44,25 @@ export function checkAuth(request, env) {
   const base64 = authHeader.slice(6);
   const decoded = atob(base64);
   const [, password] = decoded.split(':');
-  return password === env.DASHBOARD_PASSWORD;
+  return constantTimeEqual(password || '', env.DASHBOARD_PASSWORD);
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ * Compares byte-by-byte without short-circuiting.
+ */
+function constantTimeEqual(a, b) {
+  const encoder = new TextEncoder();
+  const aBuf = encoder.encode(a);
+  const bBuf = encoder.encode(b);
+  const maxLen = Math.max(aBuf.length, bBuf.length);
+  let mismatch = aBuf.length !== bBuf.length ? 1 : 0;
+  for (let i = 0; i < maxLen; i++) {
+    const aByte = i < aBuf.length ? aBuf[i] : 0;
+    const bByte = i < bBuf.length ? bBuf[i] : 0;
+    mismatch |= aByte ^ bByte;
+  }
+  return mismatch === 0;
 }
 
 export function requireAuth() {
@@ -79,5 +97,5 @@ export function html(content) {
 }
 
 export function esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

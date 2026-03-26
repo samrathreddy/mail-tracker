@@ -9,7 +9,7 @@ export function renderSequencesPage(sequences) {
   function renderSeqCard(seq) {
     const progress = `${seq.currentStep}/${seq.steps.length}`;
     const nextStep = seq.steps[seq.currentStep];
-    const nextSend = nextStep ? new Date(nextStep.scheduledAt).toLocaleString() : 'N/A';
+    const nextSend = nextStep ? new Date(nextStep.scheduledAt).toLocaleString('en-US', { timeZone: seq.timezone }) : 'N/A';
     const statusColors = {
       active: '#22c55e', stopped: '#eab308', completed: '#6366f1', paused: '#f97316',
     };
@@ -23,7 +23,7 @@ export function renderSequencesPage(sequences) {
         </div>
         <div style="color:#a1a1aa;font-size:13px;margin-bottom:4px;">Step ${esc(progress)} ${seq.templateId ? '| Template: ' + esc(seq.templateId) : '| One-off'}</div>
         ${seq.status === 'active' && nextStep ? `<div style="color:#a1a1aa;font-size:13px;">Next send: ${esc(nextSend)}</div>` : ''}
-        <div style="color:#71717a;font-size:12px;margin-top:8px;">Created: ${esc(new Date(seq.createdAt).toLocaleString())}</div>
+        <div style="color:#71717a;font-size:12px;margin-top:8px;">Created: ${esc(new Date(seq.createdAt).toLocaleString('en-US', { timeZone: seq.timezone }))}</div>
         ${seq.status === 'active' ? `
           <div style="margin-top:10px;display:flex;gap:8px;">
             <button onclick="cancelSeq('${esc(seq.id)}')" style="background:#ef4444;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>

@@ -1,5 +1,5 @@
 import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, requireAuthCors, servePixel, html } from './shared.js';
-import { sendWebhookNotifications, sendSequenceNotification } from './notifications.js';
+import { sendWebhookNotifications } from './notifications.js';
 import { renderDetail } from './views/detail.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderSequencesPage } from './views/sequences-page.js';
@@ -121,7 +121,7 @@ export default {
       const id = crypto.randomUUID().slice(0, 8);
       const senderIp = request.headers.get('cf-connecting-ip') || 'unknown';
 
-      let recipient = null, subject = '', bodyPreview = '', messageId = '';
+      let recipient, subject, bodyPreview, messageId;
 
       if (request.method === 'POST') {
         try {
@@ -130,11 +130,14 @@ export default {
           subject = body.subject || '';
           bodyPreview = body.bodyPreview || '';
           messageId = body.messageId || '';
-        } catch (e) {
+        } catch (_e) {
           return json({ error: 'Invalid JSON body' }, 400);
         }
       } else {
         recipient = url.searchParams.get('to') || null;
+        subject = '';
+        bodyPreview = '';
+        messageId = '';
       }
 
       if (recipient && !recipient.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return json({ error: 'Invalid email format' }, 400);
@@ -178,6 +181,12 @@ export default {
       const id = url.pathname.split('/d/')[1];
       if (!id) return json({ error: 'Missing id' }, 400);
       await env.TRACKER.delete(id);
+      if (env.SEQUENCES) {
+        const seqId = await env.SEQUENCES.get(`tracker-seq:${id}`);
+        if (seqId) {
+          await env.SEQUENCES.delete(`tracker-seq:${id}`);
+        }
+      }
       return json({ deleted: id });
     }
 
@@ -189,13 +198,28 @@ export default {
       const results = [];
       for (const key of list.keys) {
         const data = await env.TRACKER.get(key.name, 'json');
-        results.push({
+        const result = {
           id: key.name, email: data?.recipient || key.name,
           subject: data?.subject || '', bodyPreview: data?.bodyPreview || '',
           opens: data?.opens || 0,
           lastOpen: data?.events?.length ? data.events[data.events.length - 1].time : 'never',
           createdAt: data?.createdAt || null,
-        });
+          sequenceProgress: null,
+        };
+        if (env.SEQUENCES) {
+          const seqId = await env.SEQUENCES.get(`tracker-seq:${key.name}`);
+          if (seqId) {
+            const seq = await env.SEQUENCES.get(seqId, 'json');
+            if (seq) {
+              result.sequenceProgress = seq.status === 'completed'
+                ? 'Sequence complete'
+                : seq.status === 'active'
+                  ? `Step ${seq.currentStep + 1}/${seq.steps.length}`
+                  : seq.status === 'stopped' ? 'Stopped' : null;
+            }
+          }
+        }
+        results.push(result);
       }
 
       results.sort((a, b) => {
@@ -242,7 +266,8 @@ export default {
 
     if (url.pathname === '/templates' && request.method === 'POST') {
       if (!checkAuth(request, env)) return requireAuthCors();
-      const body = await request.json();
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
       const error = validateTemplate(body);
       if (error) return json({ error }, 400);
       const template = await createTemplate(env, body);
@@ -260,7 +285,16 @@ export default {
     if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'PUT') {
       if (!checkAuth(request, env)) return requireAuthCors();
       const id = url.pathname.split('/templates/')[1];
-      const body = await request.json();
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+      if (body.name !== undefined) {
+        if (typeof body.name !== 'string' || body.name.trim().length === 0) return json({ error: 'Name is required' }, 400);
+        if (body.name.length > 100) return json({ error: 'Name must be 100 chars or less' }, 400);
+      }
+      if (body.timezone !== undefined) {
+        try { Intl.DateTimeFormat(undefined, { timeZone: body.timezone }); }
+        catch { return json({ error: 'Invalid timezone' }, 400); }
+      }
       if (body.steps) {
         const error = validateTemplate({ name: body.name || 'temp', steps: body.steps, timezone: body.timezone });
         if (error) return json({ error }, 400);
@@ -289,7 +323,8 @@ export default {
 
     if (url.pathname === '/sequences' && request.method === 'POST') {
       if (!checkAuth(request, env)) return requireAuthCors();
-      const body = await request.json();
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
       const error = validateSequence(body);
       if (error) return json({ error }, 400);
       const result = await createSequence(env, body);
