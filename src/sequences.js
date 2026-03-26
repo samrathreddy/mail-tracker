@@ -134,7 +134,7 @@ export function validateSequence(data) {
       if (!Number.isInteger(s.delayDays) || s.delayDays < 1 || s.delayDays > 90) {
         return `Step ${i + 1}: delayDays must be 1-90`;
       }
-      if (!s.subject || s.subject.length > 500) return `Step ${i + 1}: subject required, max 500 chars`;
+      if (s.subject && s.subject.length > 500) return `Step ${i + 1}: subject must be 500 chars or less`;
       if (!s.body || s.body.length > 50000) return `Step ${i + 1}: body required, max 50000 chars`;
     }
   }

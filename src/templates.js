@@ -23,8 +23,8 @@ export function validateTemplate(data) {
     if (!Number.isInteger(step.delayDays) || step.delayDays < 1 || step.delayDays > 90) {
       return `Step ${i + 1}: delayDays must be an integer between 1 and 90`;
     }
-    if (!step.subject || step.subject.length > 500) {
-      return `Step ${i + 1}: subject is required and must be 500 chars or less`;
+    if (step.subject && step.subject.length > 500) {
+      return `Step ${i + 1}: subject must be 500 chars or less`;
     }
     if (!step.body || step.body.length > 50000) {
       return `Step ${i + 1}: body is required and must be 50,000 chars or less`;
