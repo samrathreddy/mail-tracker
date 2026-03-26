@@ -519,11 +519,11 @@
 
   function setSequenceBtnState(btn, svgEl, selected, tooltipText) {
     if (selected) {
-      btn.style.background = 'rgba(59,130,246,0.15)';
-      svgEl.style.color = '#60a5fa';
+      btn.style.background = 'rgba(59,130,246,0.1)';
+      svgEl.style.color = '#3b82f6';
     } else {
-      btn.style.background = '#3f3f46';
-      svgEl.style.color = '#94a3b8';
+      btn.style.background = 'transparent';
+      svgEl.style.color = '#5f6368';
     }
     btn.title = tooltipText;
   }
@@ -531,16 +531,23 @@
   function injectSequenceSelector(composeForm) {
     if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
 
+    // Find the formatting toolbar row (contains Aa, attachment, emoji icons)
+    const toolbar = composeForm.querySelector('tr.btC td.gU') ||
+                    composeForm.querySelector('div[aria-label*="ormatting"]')?.parentElement ||
+                    composeForm.querySelector('.bAK');
+
+    // Fallback: find the Send button's parent row
     const sendButton = composeForm.querySelector('div[role="button"][aria-label*="Send"], div[role="button"][data-tooltip*="Send"]');
-    if (!sendButton) return;
+    if (!sendButton && !toolbar) return;
 
     const container = document.createElement('div');
     container.setAttribute('data-sequence-selector', 'true');
-    container.style.cssText = 'display:inline-flex;align-items:center;margin-left:8px;position:relative;';
+    container.style.cssText = 'display:inline-flex;align-items:center;position:relative;margin-left:4px;';
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.style.cssText = 'background:#3f3f46;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;';
+    // Style to match Gmail's toolbar icons — transparent bg, subtle hover
+    btn.style.cssText = 'background:transparent;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background 0.15s;';
     btn.title = 'Select sequence';
     btn.setAttribute('data-selected-template', '');
 
@@ -667,9 +674,30 @@
       globalDropdownListenerAdded = true;
     }
 
+    // Add hover effect matching Gmail toolbar style
+    btn.addEventListener('mouseenter', function() {
+      if (!btn.getAttribute('data-selected-template') && !btn.getAttribute('data-oneoff-steps')) {
+        btn.style.background = 'rgba(0,0,0,0.06)';
+      }
+    });
+    btn.addEventListener('mouseleave', function() {
+      var hasSelection = btn.getAttribute('data-selected-template') || btn.getAttribute('data-oneoff-steps');
+      if (!hasSelection) btn.style.background = 'transparent';
+    });
+
     container.appendChild(btn);
     container.appendChild(dropdown);
-    sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
+
+    // Try to insert in the formatting toolbar row (away from Send button)
+    if (toolbar) {
+      toolbar.appendChild(container);
+    } else if (sendButton) {
+      // Fallback: insert after send button with a separator
+      container.style.marginLeft = '12px';
+      container.style.borderLeft = '1px solid #dadce0';
+      container.style.paddingLeft = '12px';
+      sendButton.parentElement.insertBefore(container, sendButton.nextSibling);
+    }
   }
 
   function _insertTextAtCursor(textarea, text) {
