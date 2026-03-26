@@ -519,10 +519,195 @@ export function getStyles() {
       color: var(--text-muted);
     }
 
+    /* ── Transitions on interactive elements ── */
+    a, button, .btn, .filter-tab, .stat-card, .list-row, .event-row, .badge, .input, .search-box {
+      transition: all 0.15s ease;
+    }
+
+    /* ── Card hover lift ── */
+    .stat-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      border-color: var(--border);
+    }
+
+    /* ── Scrollbar styling ── */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148,163,184,0.15);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148,163,184,0.25);
+    }
+
+    /* ── Focus-visible accessibility ring ── */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .input:focus-visible,
+    .btn:focus-visible,
+    .filter-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ── Fade-in animation ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .page-main > * {
+      animation: fadeIn 0.25s ease both;
+    }
+    .page-main > :nth-child(2) { animation-delay: 0.04s; }
+    .page-main > :nth-child(3) { animation-delay: 0.08s; }
+
+    /* ── Improved empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-card);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .empty-state-icon {
+      width: 40px;
+      height: 40px;
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    /* ── List row hover accent border ── */
+    .list-row {
+      border-left: 2px solid transparent;
+    }
+    .list-row:hover {
+      background: var(--bg-hover);
+      border-color: var(--border);
+      border-left-color: var(--accent);
+    }
+
+    /* ── Search box focus glow ── */
+    .search-box {
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, width 0.2s ease;
+    }
+    .search-box:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    /* ── Filter tab bottom indicator ── */
+    .filter-tab {
+      position: relative;
+    }
+    .filter-tab::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      right: 50%;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      transition: left 0.15s ease, right 0.15s ease;
+    }
+    .filter-tab.active::after {
+      left: 4px;
+      right: 4px;
+    }
+
+    /* ── Modal backdrop + appear ── */
+    .modal-overlay {
+      backdrop-filter: blur(6px);
+    }
+    .modal-close-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: none;
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .modal-close-btn:hover {
+      background: rgba(239,68,68,0.15);
+      color: var(--error);
+    }
+
+    /* ── Copied flash feedback ── */
+    @keyframes copiedFlash {
+      0% { background: rgba(34,197,94,0.2); }
+      100% { background: var(--bg-hover); }
+    }
+    .copied-flash {
+      animation: copiedFlash 0.6s ease;
+    }
+
+    /* ── Sequence callout border ── */
+    .sequence-callout {
+      border-left: 3px solid var(--accent);
+    }
+
+    /* ── Activity event left border accent ── */
+    .event-row-accent {
+      border-left: 3px solid transparent;
+      padding-left: 12px;
+    }
+
+    /* ── Ghost button (load more) ── */
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      color: var(--text-secondary);
+      padding: 10px 32px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent-light);
+      background: var(--accent-bg);
+    }
+
+    /* ── Event timeline alternating rows ── */
+    .event-row-alt:nth-child(even) {
+      background: rgba(148,163,184,0.03);
+      border-radius: var(--radius-btn);
+    }
+
     /* ── Keyframes ── */
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.95); }
     }
   `;
 }

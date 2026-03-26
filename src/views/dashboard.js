@@ -122,8 +122,11 @@ export function renderDashboard(opts) {
   }
 
   // -- Create tracker modal --
-  const modal = `<div class="modal-overlay" id="modalOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s;">
-    <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:90%;max-width:440px;transform:translateY(8px);transition:transform 0.2s;">
+  const modal = `<div class="modal-overlay" id="modalOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+    <div id="modalInner" style="position:relative;background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:90%;max-width:440px;transform:translateY(8px);transition:transform 0.2s ease, opacity 0.2s ease;opacity:0;">
+      <button class="modal-close-btn" id="modalCloseX" type="button" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
       <h2 style="font-size:1.1rem;margin-bottom:20px;font-weight:700;">Create New Tracker</h2>
       <div id="modalForm">
         <label style="display:block;font-size:0.8rem;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">Recipient Email (optional)</label>
@@ -138,11 +141,11 @@ export function renderDashboard(opts) {
       <div id="modalResult" style="display:none">
         <div>
           <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">Pixel HTML (copy into your email)</div>
-          <div class="input" id="resultHtml" style="font-family:monospace;font-size:0.75rem;word-break:break-all;user-select:all;padding:12px;"></div>
+          <div class="input" id="resultHtml" style="font-family:monospace;font-size:0.75rem;word-break:break-all;user-select:all;padding:12px;cursor:pointer;"></div>
         </div>
         <div style="margin-top:12px">
           <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">Stats URL</div>
-          <div class="input" id="resultStats" style="font-family:monospace;font-size:0.75rem;word-break:break-all;user-select:all;padding:12px;"></div>
+          <div class="input" id="resultStats" style="font-family:monospace;font-size:0.75rem;word-break:break-all;user-select:all;padding:12px;cursor:pointer;"></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
           <button class="btn btn-secondary" id="closeResult">Close</button>
@@ -213,8 +216,10 @@ export function renderDashboard(opts) {
       while (listBody.firstChild) listBody.removeChild(listBody.firstChild);
       if (items.length === 0) {
         var empty = document.createElement('div');
-        empty.style.cssText = 'text-align:center;padding:32px;color:var(--text-muted);font-size:13px;';
-        empty.textContent = DATA.length === 0 ? 'No tracked emails yet' : 'No results match your filters';
+        empty.className = 'empty-state';
+        var emptyText = document.createElement('p');
+        emptyText.textContent = DATA.length === 0 ? 'No tracked emails yet' : 'No results match your filters';
+        empty.appendChild(emptyText);
         listBody.appendChild(empty);
         return;
       }

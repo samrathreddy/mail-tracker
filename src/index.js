@@ -6,6 +6,7 @@ import { renderSequencesPage } from './views/sequences-page.js';
 import { renderTemplatesPage } from './views/templates-page.js';
 import { renderAnalyticsPage } from './views/analytics-page.js';
 import { renderActivityPage } from './views/activity-page.js';
+import { renderSettingsPage } from './views/settings-page.js';
 import { renderTemplateEditor } from './views/template-editor.js';
 import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from './templates.js';
 import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
@@ -271,6 +272,29 @@ export default {
       return html(renderDashboard({
         results, totalOpens, activeCount, sparkline,
         totalTrackers: results.length, sequences, oauthConnected,
+      }));
+    }
+
+    // GET /settings — settings page
+    if (url.pathname === '/settings' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const trackerKeys = await env.TRACKER.list();
+      let templateCount = 0, sequenceCount = 0, oauthEmail = null, oauthError = null;
+      let oauthConnected = false;
+      if (env.SEQUENCES) {
+        const tmplKeys = await env.SEQUENCES.list({ prefix: 'tmpl:' });
+        templateCount = tmplKeys.keys.length;
+        const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+        sequenceCount = seqKeys.keys.length;
+        const tokens = await env.SEQUENCES.get('oauth:tokens', 'json');
+        oauthConnected = !!tokens;
+        oauthEmail = tokens?.email || null;
+        const err = await env.SEQUENCES.get('oauth:error', 'json');
+        oauthError = err;
+      }
+      return html(renderSettingsPage({
+        oauthConnected, oauthEmail, oauthError,
+        sequenceCount, templateCount, trackerCount: trackerKeys.keys.length,
       }));
     }
 
