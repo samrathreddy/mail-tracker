@@ -34,11 +34,14 @@ export function renderTemplateEditor(template, oauthConnected) {
         outline: none;
         min-width: 200px;
         font-family: inherit;
-        transition: border-color 0.15s;
+        transition: border-color 0.15s ease;
       }
       .editor-topbar .name-input:focus {
         border-color: var(--accent);
         background: var(--bg-hover);
+      }
+      .editor-topbar .name-input:focus-visible {
+        outline: none;
       }
       .editor-topbar .name-input::placeholder {
         color: var(--text-muted);
@@ -52,6 +55,8 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-size: 12px;
         outline: none;
         font-family: inherit;
+        cursor: pointer;
+        transition: border-color 0.15s ease;
       }
       .editor-topbar .tz-select:focus {
         border-color: var(--accent);
@@ -64,18 +69,51 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-weight: 600;
         padding: 6px 14px;
         border-radius: var(--radius-btn);
-        transition: all 0.15s;
+        transition: all 0.15s ease;
+        cursor: pointer;
       }
       .cancel-link:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
       }
+
+      /* Save button with loading state */
+      .save-btn {
+        position: relative;
+        min-width: 80px;
+        justify-content: center;
+      }
+      .save-btn.saving {
+        pointer-events: none;
+        opacity: 0.7;
+      }
+      .save-btn .save-spinner {
+        display: none;
+        width: 14px;
+        height: 14px;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spinSave 0.6s linear infinite;
+      }
+      .save-btn.saving .save-spinner {
+        display: inline-block;
+      }
+      .save-btn.saving .save-label {
+        display: none;
+      }
+      @keyframes spinSave {
+        to { transform: rotate(360deg); }
+      }
+
       .editor-body {
         display: flex;
         flex: 1;
         min-height: 0;
         overflow: hidden;
       }
+
+      /* Timeline panel with responsive collapse */
       .timeline-panel {
         width: 220px;
         min-width: 220px;
@@ -86,7 +124,23 @@ export function renderTemplateEditor(template, oauthConnected) {
         display: flex;
         flex-direction: column;
         gap: 0;
+        transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease;
       }
+      @media (max-width: 680px) {
+        .timeline-panel {
+          width: 56px;
+          min-width: 56px;
+          padding: 12px 6px;
+        }
+        .timeline-node-text {
+          display: none;
+        }
+        .reorder-arrows {
+          display: none;
+        }
+      }
+
+      /* Timeline node selection transition */
       .timeline-node {
         display: flex;
         align-items: flex-start;
@@ -95,7 +149,7 @@ export function renderTemplateEditor(template, oauthConnected) {
         cursor: pointer;
         padding: 6px 8px;
         border-radius: var(--radius-btn);
-        transition: background 0.15s;
+        transition: all 0.15s ease;
       }
       .timeline-node:hover {
         background: var(--bg-hover);
@@ -110,6 +164,8 @@ export function renderTemplateEditor(template, oauthConnected) {
         margin-left: 23px;
         flex-shrink: 0;
       }
+
+      /* Timeline circle with smooth selection transition */
       .timeline-circle {
         width: 36px;
         height: 36px;
@@ -121,7 +177,7 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-size: 12px;
         font-weight: 700;
         flex-shrink: 0;
-        transition: all 0.15s;
+        transition: all 0.2s ease;
       }
       .timeline-circle.origin {
         background: var(--bg-hover);
@@ -133,6 +189,7 @@ export function renderTemplateEditor(template, oauthConnected) {
         border: 2px solid var(--accent);
         color: #fff;
         box-shadow: 0 0 12px rgba(59,130,246,0.4);
+        transform: scale(1.08);
       }
       .timeline-circle.unselected {
         background: transparent;
@@ -175,6 +232,8 @@ export function renderTemplateEditor(template, oauthConnected) {
       .timeline-node-detail.active-detail {
         color: var(--accent-light);
       }
+
+      /* Reorder arrows: more discoverable */
       .reorder-arrows {
         position: absolute;
         right: 4px;
@@ -183,8 +242,11 @@ export function renderTemplateEditor(template, oauthConnected) {
         display: flex;
         flex-direction: column;
         gap: 2px;
-        opacity: 0;
-        transition: opacity 0.15s;
+        opacity: 0.25;
+        transition: opacity 0.15s ease;
+      }
+      .timeline-node:hover .reorder-arrows {
+        opacity: 1;
       }
       .reorder-arrow {
         width: 18px;
@@ -192,18 +254,22 @@ export function renderTemplateEditor(template, oauthConnected) {
         border-radius: 4px;
         border: none;
         background: var(--bg-hover);
-        color: var(--text-secondary);
+        color: var(--text-muted);
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0;
         font-size: 10px;
-        transition: all 0.15s;
+        transition: all 0.15s ease;
       }
       .reorder-arrow:hover {
         background: var(--accent-bg);
         color: var(--accent-light);
+      }
+      .reorder-arrow:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
       }
       .editor-panel {
         flex: 1;
@@ -247,7 +313,7 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-weight: 600;
         padding: 4px 8px;
         border-radius: var(--radius-btn);
-        transition: all 0.15s;
+        transition: all 0.15s ease;
       }
       .remove-step-link:hover {
         background: rgba(239,68,68,0.12);
@@ -322,7 +388,7 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-size: 13px;
         font-weight: 700;
         font-family: inherit;
-        transition: all 0.15s;
+        transition: all 0.15s ease;
         padding: 0;
       }
       .toolbar-btn:hover {
@@ -333,7 +399,13 @@ export function renderTemplateEditor(template, oauthConnected) {
         background: var(--accent-bg);
         color: var(--accent-light);
       }
+      .toolbar-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
       .toolbar-spacer { flex: 1; }
+
+      /* Contenteditable body with inset shadow */
       .editor-area {
         min-height: 180px;
         max-height: 400px;
@@ -347,10 +419,15 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-family: inherit;
         line-height: 1.6;
         outline: none;
+        box-shadow: inset 0 2px 6px rgba(0,0,0,0.15);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
       }
       .editor-area:focus {
         border-color: var(--accent);
+        box-shadow: inset 0 2px 6px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.15);
       }
+
+      /* Variable pills with hover state */
       .var-pill {
         display: inline-block;
         background: var(--accent-bg);
@@ -360,6 +437,11 @@ export function renderTemplateEditor(template, oauthConnected) {
         font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
+        cursor: default;
+        transition: background 0.15s ease;
+      }
+      .var-pill:hover {
+        background: rgba(59,130,246,0.2);
       }
       .var-dropdown {
         position: absolute;
@@ -383,7 +465,7 @@ export function renderTemplateEditor(template, oauthConnected) {
         display: flex;
         align-items: center;
         gap: 8px;
-        transition: background 0.1s;
+        transition: background 0.1s ease;
       }
       .var-dropdown-item:hover {
         background: var(--bg-hover);
@@ -396,16 +478,23 @@ export function renderTemplateEditor(template, oauthConnected) {
         color: var(--text-muted);
         font-size: 11px;
       }
+
+      /* Preview panel with slide-down animation */
       .preview-panel {
         background: var(--bg-surface);
         border: 1px solid var(--border);
         border-radius: var(--radius-card);
-        padding: 16px;
+        padding: 0 16px;
         margin-top: 12px;
-        display: none;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: max-height 0.3s ease, opacity 0.25s ease, padding 0.3s ease;
       }
       .preview-panel.visible {
-        display: block;
+        max-height: 600px;
+        opacity: 1;
+        padding: 16px;
       }
       .preview-panel .preview-header {
         font-size: 11px;
@@ -456,6 +545,15 @@ export function renderTemplateEditor(template, oauthConnected) {
       .empty-editor p {
         font-size: 13px;
       }
+
+      /* Focus visible on all interactive elements */
+      .cancel-link:focus-visible,
+      .btn:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
     </style>`;
 
   // The save button uses an onclick attribute calling saveTemplate(), which is
@@ -480,11 +578,14 @@ export function renderTemplateEditor(template, oauthConnected) {
       </select>
       <div class="spacer"></div>
       <a href="/templates" class="cancel-link">Cancel</a>
-      <button class="btn btn-success" id="save-btn">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="10.5 3.5 5.5 9.5 3 7"/>
-        </svg>
-        Save
+      <button class="btn btn-success save-btn" id="save-btn">
+        <span class="save-spinner"></span>
+        <span class="save-label">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="10.5 3.5 5.5 9.5 3 7"/>
+          </svg>
+          Save
+        </span>
       </button>
     </div>`;
 
@@ -544,6 +645,7 @@ function buildClientScripts(template) {
     var previewVisible = false;
     var lastFocusedField = null;
     var previewDebounceTimer = null;
+    var isSaving = false;
 
     var VARIABLES = [
       { name: 'firstName', desc: "Recipient's first name" },
@@ -733,6 +835,26 @@ function buildClientScripts(template) {
       }
     }
 
+    /* Track active formatting for toolbar button states */
+    function updateToolbarState() {
+      var boldBtn = document.getElementById('toolbar-bold');
+      var italicBtn = document.getElementById('toolbar-italic');
+      if (boldBtn) {
+        if (document.queryCommandState('bold')) {
+          boldBtn.classList.add('active');
+        } else {
+          boldBtn.classList.remove('active');
+        }
+      }
+      if (italicBtn) {
+        if (document.queryCommandState('italic')) {
+          italicBtn.classList.add('active');
+        } else {
+          italicBtn.classList.remove('active');
+        }
+      }
+    }
+
     function renderEditor() {
       var panel = document.getElementById('editor-panel');
       while (panel.firstChild) panel.removeChild(panel.firstChild);
@@ -871,8 +993,13 @@ function buildClientScripts(template) {
       var toolbar = document.createElement('div');
       toolbar.className = 'editor-toolbar';
 
-      toolbar.appendChild(createToolbarBtn('B', 'bold', 'font-weight:700'));
-      toolbar.appendChild(createToolbarBtn('I', 'italic', 'font-style:italic'));
+      var boldBtn = createToolbarBtn('B', 'bold', 'font-weight:700');
+      boldBtn.id = 'toolbar-bold';
+      toolbar.appendChild(boldBtn);
+
+      var italicBtn = createToolbarBtn('I', 'italic', 'font-style:italic');
+      italicBtn.id = 'toolbar-italic';
+      toolbar.appendChild(italicBtn);
 
       var linkBtn = document.createElement('button');
       linkBtn.type = 'button';
@@ -939,6 +1066,9 @@ function buildClientScripts(template) {
       bodyEl.innerHTML = step.body;
       bodyEl.addEventListener('focus', function() { lastFocusedField = 'body'; });
       bodyEl.addEventListener('input', function() { debouncePreviewUpdate(); });
+      /* Track selection changes for toolbar active state */
+      bodyEl.addEventListener('keyup', updateToolbarState);
+      bodyEl.addEventListener('mouseup', updateToolbarState);
       bodyField.appendChild(bodyEl);
 
       // Preview panel
@@ -968,6 +1098,7 @@ function buildClientScripts(template) {
         var bodyArea = document.getElementById('step-body');
         if (bodyArea) bodyArea.focus();
         document.execCommand(command);
+        updateToolbarState();
       });
       return btn;
     }
@@ -1176,11 +1307,16 @@ function buildClientScripts(template) {
     }
 
     function saveTemplate() {
+      if (isSaving) return;
       var data = collectTemplate();
       if (data.steps.length === 0) {
         alert('Add at least one follow-up step before saving.');
         return;
       }
+
+      var saveBtn = document.getElementById('save-btn');
+      isSaving = true;
+      saveBtn.classList.add('saving');
 
       var isEdit = template && template.id;
       var method = isEdit ? 'PUT' : 'POST';
@@ -1196,6 +1332,8 @@ function buildClientScripts(template) {
       }).then(function() {
         window.location.href = '/templates';
       }).catch(function(err) {
+        isSaving = false;
+        saveBtn.classList.remove('saving');
         alert('Error: ' + err.message);
       });
     }

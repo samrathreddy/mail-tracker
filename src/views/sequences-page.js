@@ -48,6 +48,12 @@ export function renderSequencesPage(sequences, oauthConnected) {
     stopped: 'yellow',
     paused: 'orange',
   };
+  const statusBorderColor = {
+    active: 'var(--success)',
+    completed: 'var(--accent)',
+    stopped: 'var(--warning)',
+    paused: '#f97316',
+  };
 
   // -- Build sequence rows --
   const rowsHtml = sequences
@@ -55,6 +61,7 @@ export function renderSequencesPage(sequences, oauthConnected) {
       const dotColor = statusDotColor[seq.status] || 'var(--text-muted)';
       const badgeVariant = statusBadgeVariant[seq.status] || 'gray';
       const templateLabel = seq.templateId ? esc(seq.templateId) : 'One-off';
+      const borderColor = statusBorderColor[seq.status] || 'var(--text-muted)';
 
       // Build step progress data
       const stepData = seq.steps.map((step, i) => {
@@ -74,7 +81,7 @@ export function renderSequencesPage(sequences, oauthConnected) {
       if (seq.status === 'active') {
         const nextStep = seq.steps[seq.currentStep];
         if (nextStep && nextStep.scheduledAt) {
-          nextSendHtml = `<span style="font-size:11px;color:var(--text-muted);">Next: ${esc(new Date(nextStep.scheduledAt).toLocaleString())}</span>`;
+          nextSendHtml = `<span class="seq-next-send">${esc(new Date(nextStep.scheduledAt).toLocaleString())}</span>`;
         }
       }
 
@@ -82,11 +89,11 @@ export function renderSequencesPage(sequences, oauthConnected) {
       let actionsHtml = '';
       if (seq.status === 'active') {
         actionsHtml = `
-          <button class="btn btn-danger btn-sm" data-cancel="${esc(seq.id)}" style="padding:3px 10px;font-size:11px;">Cancel</button>
-          <button class="btn btn-primary btn-sm" data-skip="${esc(seq.id)}" style="padding:3px 10px;font-size:11px;">Skip</button>`;
+          <button class="btn seq-btn-cancel" data-cancel="${esc(seq.id)}">Cancel</button>
+          <button class="btn seq-btn-skip" data-skip="${esc(seq.id)}">Skip</button>`;
       }
 
-      return `<div class="list-row" data-status="${esc(seq.status)}">
+      return `<div class="list-row seq-row" data-status="${esc(seq.status)}" data-border-color="${borderColor}">
         <div class="row-dot" style="background:${dotColor};box-shadow:0 0 6px ${dotColor}40;"></div>
         <div style="flex:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
           <span style="font-weight:600;font-size:13px;">${esc(seq.recipient)}</span>
@@ -111,8 +118,112 @@ export function renderSequencesPage(sequences, oauthConnected) {
   // -- Empty state --
   const emptyState =
     sequences.length === 0
-      ? '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px;">No sequences yet. Create one from Gmail or the extension.</div>'
+      ? `<div class="seq-empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.3;">
+            <circle cx="3" cy="4" r="1.5"/>
+            <line x1="7" y1="4" x2="20" y2="4"/>
+            <circle cx="3" cy="12" r="1.5"/>
+            <line x1="7" y1="12" x2="20" y2="12"/>
+            <circle cx="3" cy="20" r="1.5"/>
+            <line x1="7" y1="20" x2="20" y2="20"/>
+          </svg>
+          <p style="font-size:14px;font-weight:600;color:var(--text-secondary);margin-top:4px;">No sequences yet</p>
+          <p style="font-size:12px;color:var(--text-muted);">Create one from Gmail or the extension to start tracking follow-ups.</p>
+        </div>`
       : '';
+
+  // -- Page-specific styles --
+  const pageStyles = `<style>
+    /* Sequence row hover lift */
+    .seq-row {
+      transition: all 0.15s ease;
+      border-left: 3px solid transparent;
+    }
+    .seq-row:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      border-left-color: var(--_row-border, var(--text-muted));
+    }
+
+    /* Pending step dot pulse */
+    .step-dot.pending {
+      animation: stepPulse 2s ease-in-out infinite;
+    }
+    @keyframes stepPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(107,124,158,0.3); }
+      50% { box-shadow: 0 0 8px 2px rgba(107,124,158,0.25); }
+    }
+
+    /* Status badges consistent sizing */
+    .seq-row .badge {
+      min-width: 68px;
+      text-align: center;
+      padding: 3px 10px;
+    }
+
+    /* Cancel/Skip buttons */
+    .seq-btn-cancel,
+    .seq-btn-skip {
+      padding: 3px 10px;
+      font-size: 11px;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .seq-btn-cancel {
+      background: rgba(239,68,68,0.08);
+      color: var(--text-secondary);
+    }
+    .seq-btn-cancel:hover {
+      background: rgba(239,68,68,0.2);
+      color: var(--error);
+    }
+    .seq-btn-skip {
+      background: var(--accent-bg);
+      color: var(--text-secondary);
+    }
+    .seq-btn-skip:hover {
+      background: rgba(59,130,246,0.2);
+      color: var(--accent-light);
+    }
+
+    /* Next send time styling */
+    .seq-next-send {
+      font-size: 11px;
+      color: var(--accent-light);
+      background: var(--accent-bg);
+      padding: 2px 8px;
+      border-radius: var(--radius-badge);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Filter tabs smooth transition */
+    .filter-tab {
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .filter-tab.active {
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.2);
+    }
+
+    /* Empty state */
+    .seq-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 20px;
+      gap: 4px;
+    }
+
+    /* Focus visible states */
+    .filter-tab:focus-visible,
+    .btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+  </style>`;
 
   // -- List panel --
   const listPanel = `<div class="list-panel">
@@ -134,6 +245,7 @@ export function renderSequencesPage(sequences, oauthConnected) {
   </div>`;
 
   const bodyHtml = `
+    ${pageStyles}
     <div style="padding:0 32px 32px;">
       <div style="margin-top:16px;">${listPanel}</div>
     </div>`;
@@ -141,6 +253,14 @@ export function renderSequencesPage(sequences, oauthConnected) {
   // -- Client-side scripts --
   const scripts = `
     var SEQUENCES = ${safeJson(sequences)};
+
+    /* Apply border color custom property from data attribute */
+    document.querySelectorAll('.seq-row').forEach(function(row) {
+      var borderColor = row.getAttribute('data-border-color');
+      if (borderColor) {
+        row.style.setProperty('--_row-border', borderColor);
+      }
+    });
 
     /* Filter tab switching */
     document.querySelectorAll('.filter-tab').forEach(function(tab) {
