@@ -567,7 +567,7 @@ export function getStyles() {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .page-main > * {
+    .page-main > *:not(.modal-overlay) {
       animation: fadeIn 0.25s ease both;
     }
     .page-main > :nth-child(2) { animation-delay: 0.04s; }
