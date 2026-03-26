@@ -897,7 +897,7 @@ function buildClientScripts(template) {
       var delayField = document.createElement('div');
       delayField.className = 'editor-field';
       var delayLabel = document.createElement('label');
-      delayLabel.textContent = 'Send after (days from original)';
+      delayLabel.textContent = 'Send after (business days from previous step)';
       delayField.appendChild(delayLabel);
       var delayRow = document.createElement('div');
       delayRow.className = 'field-row';

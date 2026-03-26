@@ -65,7 +65,7 @@ Follow-up emails are sent automatically via Gmail API on a configurable schedule
 
 **Cron:** `*/5 * * * *` — sends due follow-ups and checks threads for replies (reply check throttled to every 15 min). 30-second execution limit; batches with cursor if needed.
 
-**Timezone:** Scheduling uses `Intl.DateTimeFormat` with 8am-6pm send window per sequence timezone. Outside window -> snaps to 9am next day.
+**Scheduling:** `delayDays` counts business days (Mon-Fri) relative to the previous step (or original email for step 1). Uses `Intl.DateTimeFormat` with 8am-6pm send window per sequence timezone. Outside window or weekends -> snaps to 9am next business day.
 
 **Stop conditions:** Per-step configurable: `open` (checked on pixel fire + cron), `reply` (checked via Gmail API thread polling), or manual cancellation.
 

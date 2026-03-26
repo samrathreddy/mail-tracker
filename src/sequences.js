@@ -53,10 +53,23 @@ export function computeScheduledAt(createdAt, delayDays, timezone) {
   // Get the origin time in the target timezone
   const originLocal = parseTzParts(formatter, origin);
 
-  // Compute the target local date by adding delayDays
-  // Use Date.UTC to handle month/day overflow correctly
+  // Add delayDays as BUSINESS days (skip weekends)
+  let calendarDays = 0;
+  let businessDaysCounted = 0;
+  while (businessDaysCounted < delayDays) {
+    calendarDays++;
+    const candidateMs = Date.UTC(
+      originLocal.year, originLocal.month, originLocal.day + calendarDays,
+      originLocal.hour, originLocal.minute, originLocal.second
+    );
+    const dayOfWeek = new Date(candidateMs).getUTCDay(); // 0=Sun, 6=Sat
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      businessDaysCounted++;
+    }
+  }
+
   const targetLocalMs = Date.UTC(
-    originLocal.year, originLocal.month, originLocal.day + delayDays,
+    originLocal.year, originLocal.month, originLocal.day + calendarDays,
     originLocal.hour, originLocal.minute, originLocal.second
   );
 
@@ -71,11 +84,16 @@ export function computeScheduledAt(createdAt, delayDays, timezone) {
     sendHour = 9;
     sendMinute = 0;
   } else if (sendHour >= 18) {
-    // Snap to 9am next day
-    const nextDay = new Date(Date.UTC(sendYear, sendMonth, sendDay + 1, 9, 0, 0));
-    sendYear = nextDay.getUTCFullYear();
-    sendMonth = nextDay.getUTCMonth();
-    sendDay = nextDay.getUTCDate();
+    // Snap to 9am next business day
+    let nextDayOffset = 1;
+    let nextDayMs = Date.UTC(sendYear, sendMonth, sendDay + nextDayOffset, 9, 0, 0);
+    while (new Date(nextDayMs).getUTCDay() === 0 || new Date(nextDayMs).getUTCDay() === 6) {
+      nextDayOffset++;
+      nextDayMs = Date.UTC(sendYear, sendMonth, sendDay + nextDayOffset, 9, 0, 0);
+    }
+    sendYear = new Date(nextDayMs).getUTCFullYear();
+    sendMonth = new Date(nextDayMs).getUTCMonth();
+    sendDay = new Date(nextDayMs).getUTCDate();
     sendHour = 9;
     sendMinute = 0;
   }
@@ -179,18 +197,24 @@ export async function createSequence(env, data) {
     timezone,
     currentStep: 0,
     status: 'active',
-    steps: steps.map((s) => ({
-      delayDays: s.delayDays,
-      subject: s.subject,
-      body: s.body,
-      stopOn: s.stopOn || [],
-      scheduledAt: computeScheduledAt(now, s.delayDays, timezone),
-      sentAt: null,
-      sentMessageId: null,
-      status: 'pending',
-      retryCount: 0,
-      failedReason: null,
-    })),
+    steps: steps.reduce((acc, s) => {
+      // Each step is relative to the previous step's scheduledAt (or original email time for step 1)
+      const baseTime = acc.length > 0 ? acc[acc.length - 1].scheduledAt : now;
+      const scheduledAt = computeScheduledAt(baseTime, s.delayDays, timezone);
+      acc.push({
+        delayDays: s.delayDays,
+        subject: s.subject,
+        body: s.body,
+        stopOn: s.stopOn || [],
+        scheduledAt,
+        sentAt: null,
+        sentMessageId: null,
+        status: 'pending',
+        retryCount: 0,
+        failedReason: null,
+      });
+      return acc;
+    }, []),
     variables: data.variables || {},
     stoppedAt: null,
     stoppedReason: null,
