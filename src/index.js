@@ -6,6 +6,7 @@ import { renderSequencesPage } from './views/sequences-page.js';
 import { renderTemplatesPage } from './views/templates-page.js';
 import { renderAnalyticsPage } from './views/analytics-page.js';
 import { renderActivityPage } from './views/activity-page.js';
+import { renderTemplateEditor } from './views/template-editor.js';
 import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from './templates.js';
 import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
 import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
@@ -282,6 +283,21 @@ export default {
       return html(renderSequencesPage(sequences, oauthConnected));
     }
 
+    if (url.pathname === '/templates/new' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderTemplateEditor(null, oauthConnected));
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+\/edit$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const id = url.pathname.match(/^\/templates\/(tmpl:[a-f0-9]+)\/edit$/)[1];
+      const tmpl = await getTemplate(env, id);
+      if (!tmpl) return new Response('Template not found', { status: 404 });
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderTemplateEditor(tmpl, oauthConnected));
+    }
+
     if (url.pathname === '/templates' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
       if (!checkAuth(request, env)) return requireAuth();
       const templates = await listTemplates(env);
@@ -295,7 +311,13 @@ export default {
       const analyticsData = await Promise.all(analyticsKeys.keys.map(k => env.SEQUENCES.get(k.name, 'json')));
       const templates = await listTemplates(env);
       const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
-      return html(renderAnalyticsPage(analyticsData.filter(Boolean), templates, oauthConnected));
+      const dailyKeys = await env.SEQUENCES.list({ prefix: 'analytics-daily:' });
+      const dailyDataMap = {};
+      for (const k of dailyKeys.keys) {
+        const d = await env.SEQUENCES.get(k.name, 'json');
+        if (d) dailyDataMap[d.templateId] = d.days;
+      }
+      return html(renderAnalyticsPage(analyticsData.filter(Boolean), templates, oauthConnected, dailyDataMap));
     }
 
     // GET /activity — activity feed page
