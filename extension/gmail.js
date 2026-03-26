@@ -83,6 +83,17 @@
   });
 
   // Extract email addresses from a compose form
+  // Patterns for BCC logging addresses that should NOT get trackers/sequences
+  var BCC_LOGGING_PATTERNS = [
+    /@bcc\..*\.hubspot\.com$/i,    // HubSpot BCC logging
+    /@.*\.salesforce\.com$/i,       // Salesforce BCC logging
+    /@bcc\..*\.hubspotfree\.com$/i, // HubSpot free BCC
+  ];
+
+  function isBccLoggingAddress(email) {
+    return BCC_LOGGING_PATTERNS.some(function(p) { return p.test(email); });
+  }
+
   function getRecipients(composeForm) {
     const recipients = new Set();
 
@@ -104,7 +115,18 @@
       if (email && email.includes('@')) recipients.add(email.toLowerCase());
     });
 
-    return Array.from(recipients);
+    // Filter out BCC logging addresses — they get tracked separately via getBccLoggingAddresses()
+    return Array.from(recipients).filter(function(email) { return !isBccLoggingAddress(email); });
+  }
+
+  // Extract BCC logging addresses (e.g., HubSpot) to include on follow-ups for CRM logging
+  function getBccLoggingAddresses(composeForm) {
+    var allEmails = new Set();
+    composeForm.querySelectorAll('span[email], [data-hovercard-id], [email]').forEach(function(el) {
+      var email = el.getAttribute('email') || el.getAttribute('data-hovercard-id');
+      if (email && email.includes('@')) allEmails.add(email.toLowerCase());
+    });
+    return Array.from(allEmails).filter(isBccLoggingAddress);
   }
 
   // Extract email subject and body preview
@@ -327,6 +349,7 @@
       if (templateId || oneoffSteps) {
         const { subject, bodyPreview } = getEmailContent(form);
         const allRecipients = getRecipients(form);
+        const bccAddresses = getBccLoggingAddresses(form);
         for (const recipient of allRecipients) {
           const img = bodyEl.querySelector('img[data-mail-tracker-to="' + recipient + '"]');
           const trackerId = img ? new URL(img.src).pathname.split('/t/')[1] : null;
@@ -345,6 +368,7 @@
                   recipient: recipient,
                   originalMessageId: messageIdAttr || null,
                   threadId: null,
+                  hubspotBcc: bccAddresses.length > 0 ? bccAddresses[0] : null,
                   variables: { subject: subject, originalBody: bodyPreview },
                   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 });
@@ -355,6 +379,7 @@
                   recipient: recipient,
                   originalMessageId: messageIdAttr || null,
                   threadId: null,
+                  hubspotBcc: bccAddresses.length > 0 ? bccAddresses[0] : null,
                   variables: { subject: subject, originalBody: bodyPreview },
                   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 });

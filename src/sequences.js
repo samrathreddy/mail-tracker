@@ -194,6 +194,7 @@ export async function createSequence(env, data) {
     recipient: data.recipient,
     threadId: data.threadId || null,
     originalMessageId: data.originalMessageId || null,
+    hubspotBcc: data.hubspotBcc || null,
     timezone,
     currentStep: 0,
     status: 'active',

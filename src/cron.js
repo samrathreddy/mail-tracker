@@ -137,6 +137,7 @@ async function sendDueFollowUps(env) {
       body: renderedBody,
       threadId: seq.threadId,
       inReplyTo: seq.originalMessageId,
+      bcc: seq.hubspotBcc || null,
     });
 
     if (result.error) {

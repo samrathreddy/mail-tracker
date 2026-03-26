@@ -171,7 +171,7 @@ function sanitizeHeader(value) {
 /**
  * Build an RFC 2822 MIME message and base64url encode it.
  */
-function buildMimeMessage({ to, subject, body, from, inReplyTo, references }) {
+function buildMimeMessage({ to, subject, body, from, bcc, inReplyTo, references }) {
   const lines = [];
 
   if (from) {
@@ -180,6 +180,13 @@ function buildMimeMessage({ to, subject, body, from, inReplyTo, references }) {
 
   lines.push(
     `To: ${sanitizeHeader(to)}`,
+  );
+
+  if (bcc) {
+    lines.push(`Bcc: ${sanitizeHeader(bcc)}`);
+  }
+
+  lines.push(
     `Subject: ${sanitizeHeader(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
@@ -207,7 +214,7 @@ function buildMimeMessage({ to, subject, body, from, inReplyTo, references }) {
  * Send a follow-up email via Gmail API.
  * Returns { messageId } or { error, status }.
  */
-export async function sendFollowUp(env, { to, subject, body, threadId, inReplyTo }) {
+export async function sendFollowUp(env, { to, subject, body, threadId, inReplyTo, bcc }) {
   const { token, error } = await getAccessToken(env);
   if (error) return { error, status: 401 };
 
@@ -220,6 +227,7 @@ export async function sendFollowUp(env, { to, subject, body, threadId, inReplyTo
     subject,
     body,
     from: fromEmail,
+    bcc: bcc || null,
     inReplyTo,
     references: inReplyTo,
   });
