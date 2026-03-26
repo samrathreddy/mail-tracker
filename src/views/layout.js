@@ -217,13 +217,20 @@ export function renderLayout(opts) {
       background: rgba(255,255,255,0.04);
     }
     .nav-item.active {
-      background: rgba(59,130,246,0.12);
       color: #60a5fa;
     }
+    .nav-item.active .nav-icon {
+      background: rgba(59,130,246,0.12);
+      border-radius: 8px;
+    }
     nav.sidebar:hover .nav-item.active {
+      background: rgba(59,130,246,0.12);
       border-left: 3px solid #3b82f6;
       border-radius: 0 8px 8px 0;
       padding-left: 7px;
+    }
+    nav.sidebar:hover .nav-item.active .nav-icon {
+      background: none;
     }
 
     .nav-icon {

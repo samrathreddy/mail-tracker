@@ -56,71 +56,12 @@ export function getStyles() {
     }
     .page-main {
       flex: 1;
-      padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 16px;
       overflow-y: auto;
-    }
-
-    /* ── Sidebar ── */
-    .sidebar {
-      width: 56px;
-      background: var(--bg-sidebar);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 16px 0;
-      gap: 20px;
-    }
-    .sidebar-logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #3b82f6, #60a5fa);
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(59,130,246,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .sidebar-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.15s;
-      position: relative;
-      text-decoration: none;
-    }
-    .sidebar-icon:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-    }
-    .sidebar-icon.active {
-      background: var(--accent-bg);
-      color: var(--accent-light);
-    }
-    .sidebar-icon:hover::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: calc(100% + 8px);
-      top: 50%;
-      transform: translateY(-50%);
-      background: var(--bg-elevated);
-      color: var(--text-primary);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      white-space: nowrap;
-      pointer-events: none;
-      border: 1px solid var(--border);
-      z-index: 100;
+      background: var(--bg-base);
+      padding: 24px 32px;
     }
 
     /* ── Page Header ── */
@@ -132,6 +73,7 @@ export function getStyles() {
     .page-header h1 {
       font-size: 20px;
       font-weight: 700;
+      color: var(--text-primary);
     }
     .page-header p {
       font-size: 12px;
