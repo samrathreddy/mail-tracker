@@ -31,9 +31,13 @@ export function renderActivityPage(events, totalCount, offset, oauthConnected) {
     const dataType = getFilterType(evt.type);
     const fullTime = evt.fullTime ? ` title="${esc(evt.fullTime)}"` : '';
 
+    const detailLine = evt.detail
+      ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${evt.detail}</div>`
+      : '';
+
     return `<div class="event-row event-row-accent" data-type="${esc(dataType)}" style="border-left-color:${borderColor};padding:10px 12px;">
       <div class="event-dot" style="background:${dotColor};${glowStyle}"></div>
-      <div class="event-text">${evt.description}</div>
+      <div class="event-text">${evt.description}${detailLine}</div>
       <div class="event-time"${fullTime}>${esc(evt.timeAgo)}</div>
     </div>`;
   }).join('');

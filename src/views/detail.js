@@ -450,14 +450,68 @@ export function renderDetail(id, data, sequenceInfo, oauthConnected) {
         var reason = document.createElement('div'); reason.style.cssText = 'font-size:11px;color:var(--warning);font-weight:500;margin-top:2px;';
         reason.textContent = e.reason === 'sender_ip' ? 'Self-open' : 'Bot / Proxy';
         content.appendChild(reason);
-      } else if (e.country) {
-        var country = document.createElement('div'); country.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;';
-        country.textContent = e.country;
-        content.appendChild(country);
+        // Show location + ISP for filtered events if available
+        var filtLoc = buildLocationString(e);
+        if (filtLoc) {
+          var filtLocDiv = document.createElement('div'); filtLocDiv.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:1px;';
+          filtLocDiv.textContent = filtLoc;
+          content.appendChild(filtLocDiv);
+        }
+        if (e.ip) {
+          var filtIp = document.createElement('div'); filtIp.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:1px;';
+          filtIp.textContent = e.ip;
+          content.appendChild(filtIp);
+        }
+      } else {
+        // Line 2: Location + Device
+        var locParts = [];
+        if (e.city && e.city !== 'unknown') locParts.push(e.city);
+        if (e.region && e.region !== 'unknown') locParts.push(e.region);
+        if (e.country && e.country !== 'unknown') locParts.push(e.country);
+        var locStr = locParts.join(', ');
+
+        var devStr = '';
+        if (e.browser && e.browser !== 'Unknown') {
+          devStr = e.browser;
+          if (e.os && e.os !== 'Unknown') devStr += ' on ' + e.os;
+          if (e.device && e.device !== 'Desktop') devStr += ' (' + e.device + ')';
+        }
+
+        var line2Parts = [locStr, devStr].filter(Boolean);
+        if (line2Parts.length > 0) {
+          var line2 = document.createElement('div'); line2.style.cssText = 'font-size:11px;color:var(--text-secondary);margin-top:2px;';
+          line2.textContent = line2Parts.join(' \\u00b7 ');
+          content.appendChild(line2);
+        } else if (e.country && e.country !== 'unknown') {
+          // Fallback for older events with only country
+          var countryDiv = document.createElement('div'); countryDiv.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;';
+          countryDiv.textContent = e.country;
+          content.appendChild(countryDiv);
+        }
+
+        // Line 3: ISP + IP (muted)
+        var line3Parts = [];
+        if (e.isp && e.isp !== 'unknown') line3Parts.push(e.isp);
+        if (e.ip) line3Parts.push(e.ip);
+        if (line3Parts.length > 0) {
+          var line3 = document.createElement('div'); line3.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:1px;';
+          line3.textContent = line3Parts.join(' \\u00b7 ');
+          content.appendChild(line3);
+        }
       }
-      var timeCol = document.createElement('div'); timeCol.className = 'event-time'; timeCol.textContent = e.ip;
-      item.appendChild(evDot); item.appendChild(content); item.appendChild(timeCol);
+      item.appendChild(evDot); item.appendChild(content);
       return item;
+    }
+
+    function buildLocationString(e) {
+      var parts = [];
+      if (e.city && e.city !== 'unknown') parts.push(e.city);
+      if (e.region && e.region !== 'unknown') parts.push(e.region);
+      if (e.isp && e.isp !== 'unknown') {
+        if (parts.length > 0) return parts.join(', ') + ' \\u00b7 ' + e.isp;
+        return e.isp;
+      }
+      return parts.join(', ');
     }
 
     var opensTab = document.getElementById('opensTab');
