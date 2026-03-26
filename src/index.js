@@ -1,10 +1,11 @@
-import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, requireAuthCors, servePixel, html } from './shared.js';
+import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, requireAuthCors, servePixel, html, esc } from './shared.js';
 import { sendWebhookNotifications } from './notifications.js';
 import { renderDetail } from './views/detail.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderSequencesPage } from './views/sequences-page.js';
 import { renderTemplatesPage } from './views/templates-page.js';
 import { renderAnalyticsPage } from './views/analytics-page.js';
+import { renderActivityPage } from './views/activity-page.js';
 import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from './templates.js';
 import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
 import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
@@ -275,13 +276,15 @@ export default {
     if (url.pathname === '/sequences' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
       if (!checkAuth(request, env)) return requireAuth();
       const sequences = await listSequences(env);
-      return html(renderSequencesPage(sequences));
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderSequencesPage(sequences, oauthConnected));
     }
 
     if (url.pathname === '/templates' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
       if (!checkAuth(request, env)) return requireAuth();
       const templates = await listTemplates(env);
-      return html(renderTemplatesPage(templates));
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderTemplatesPage(templates, oauthConnected));
     }
 
     if (url.pathname === '/analytics' && request.method === 'GET') {
@@ -289,7 +292,133 @@ export default {
       const analyticsKeys = await env.SEQUENCES.list({ prefix: 'analytics:' });
       const analyticsData = await Promise.all(analyticsKeys.keys.map(k => env.SEQUENCES.get(k.name, 'json')));
       const templates = await listTemplates(env);
-      return html(renderAnalyticsPage(analyticsData.filter(Boolean), templates));
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderAnalyticsPage(analyticsData.filter(Boolean), templates, oauthConnected));
+    }
+
+    // GET /activity — activity feed page
+    if (url.pathname === '/activity' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+
+      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const allEvents = [];
+
+      // Collect events from trackers
+      const trackerList = await env.TRACKER.list();
+      for (const key of trackerList.keys) {
+        const data = await env.TRACKER.get(key.name, 'json');
+        if (!data) continue;
+
+        const recipient = data.recipient || key.name;
+        const subject = data.subject || 'Untitled';
+
+        // Open events
+        if (data.events) {
+          for (const evt of data.events) {
+            allEvents.push({
+              type: 'open',
+              time: evt.time,
+              description: `<strong>${esc(recipient)}</strong> opened <em>${esc(subject)}</em>`,
+            });
+          }
+        }
+
+        // Filtered events
+        if (data.filteredEvents) {
+          for (const evt of data.filteredEvents) {
+            allEvents.push({
+              type: 'filtered',
+              time: evt.time,
+              description: `Open from <strong>${esc(recipient)}</strong> filtered — <em>${esc(evt.reason || 'unknown')}</em>`,
+            });
+          }
+        }
+
+        // Tracker created
+        if (data.createdAt) {
+          allEvents.push({
+            type: 'tracker_created',
+            time: data.createdAt,
+            description: `Tracker created for <strong>${esc(recipient)}</strong> — <em>${esc(subject)}</em>`,
+          });
+        }
+      }
+
+      // Collect events from sequences
+      if (env.SEQUENCES) {
+        const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+        for (const k of seqKeys.keys) {
+          const seq = await env.SEQUENCES.get(k.name, 'json');
+          if (!seq) continue;
+
+          const seqRecipient = seq.recipient || k.name;
+
+          // Steps with sentAt
+          if (seq.steps) {
+            for (const step of seq.steps) {
+              if (step.sentAt) {
+                allEvents.push({
+                  type: 'follow_up_sent',
+                  time: step.sentAt,
+                  description: `Follow-up sent to <strong>${esc(seqRecipient)}</strong> — <em>${esc(step.subject || 'Step')}</em>`,
+                });
+              }
+            }
+          }
+
+          // Stopped sequences
+          if (seq.status === 'stopped' && seq.stoppedAt) {
+            allEvents.push({
+              type: 'sequence_stopped',
+              time: seq.stoppedAt,
+              description: `Sequence stopped for <strong>${esc(seqRecipient)}</strong> — <em>${esc(seq.stopReason || 'manual')}</em>`,
+            });
+          }
+
+          // Completed sequences
+          if (seq.status === 'completed' && seq.completedAt) {
+            allEvents.push({
+              type: 'sequence_completed',
+              time: seq.completedAt,
+              description: `Sequence completed for <strong>${esc(seqRecipient)}</strong>`,
+            });
+          }
+        }
+      }
+
+      // Sort by time descending and paginate
+      allEvents.sort((a, b) => new Date(b.time) - new Date(a.time));
+      const totalCount = allEvents.length;
+      const pageEvents = allEvents.slice(offset, offset + 50);
+
+      // Compute relative timeAgo
+      const now = Date.now();
+      const eventsWithTimeAgo = pageEvents.map(evt => {
+        const diff = now - new Date(evt.time).getTime();
+        const mins = Math.floor(diff / 60000);
+        let timeAgo;
+        if (mins < 1) timeAgo = 'just now';
+        else if (mins < 60) timeAgo = mins + 'm ago';
+        else {
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) timeAgo = hrs + 'h ago';
+          else {
+            const days = Math.floor(hrs / 24);
+            if (days < 30) timeAgo = days + 'd ago';
+            else timeAgo = new Date(evt.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }
+        }
+        return { type: evt.type, description: evt.description, timeAgo };
+      });
+
+      // Check OAuth status
+      let oauthConnected = false;
+      if (env.SEQUENCES) {
+        const tokens = await env.SEQUENCES.get('oauth:tokens');
+        oauthConnected = !!tokens;
+      }
+
+      return html(renderActivityPage(eventsWithTimeAgo, totalCount, offset, oauthConnected));
     }
 
     // === TEMPLATE ROUTES ===

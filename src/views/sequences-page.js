@@ -1,72 +1,199 @@
-import { esc, FAVICON, LOGO_SVG } from '../shared.js';
+import { esc } from '../shared.js';
+import { renderLayout } from './layout.js';
+import {
+  renderFilterTabs,
+  renderStepProgress,
+  renderBadge,
+  safeJson,
+} from './components.js';
 
-export function renderSequencesPage(sequences) {
-  const active = sequences.filter(s => s.status === 'active');
-  const stopped = sequences.filter(s => s.status === 'stopped');
-  const completed = sequences.filter(s => s.status === 'completed');
-  const paused = sequences.filter(s => s.status === 'paused');
+/**
+ * Renders the sequences list page using the shared design system.
+ *
+ * @param {Array} sequences - Array of sequence objects
+ * @param {boolean} oauthConnected - Whether Gmail OAuth is connected
+ * @returns {string} Complete HTML page
+ */
+export function renderSequencesPage(sequences, oauthConnected) {
+  // -- Compute status counts --
+  const counts = { all: sequences.length, active: 0, paused: 0, stopped: 0, completed: 0 };
+  for (const seq of sequences) {
+    if (counts[seq.status] !== undefined) {
+      counts[seq.status]++;
+    }
+  }
 
-  function renderSeqCard(seq) {
-    const progress = `${seq.currentStep}/${seq.steps.length}`;
-    const nextStep = seq.steps[seq.currentStep];
-    const nextSend = nextStep ? new Date(nextStep.scheduledAt).toLocaleString('en-US', { timeZone: seq.timezone }) : 'N/A';
-    const statusColors = {
-      active: '#22c55e', stopped: '#eab308', completed: '#6366f1', paused: '#f97316',
-    };
-    const statusColor = statusColors[seq.status] || '#71717a';
+  // -- Filter tabs --
+  const filterTabsHtml = renderFilterTabs(
+    [
+      { key: 'all', label: 'All', count: counts.all },
+      { key: 'active', label: 'Active', count: counts.active },
+      { key: 'paused', label: 'Paused', count: counts.paused },
+      { key: 'stopped', label: 'Stopped', count: counts.stopped },
+      { key: 'completed', label: 'Completed', count: counts.completed },
+    ],
+    'all',
+  );
 
-    return `
-      <div style="background:#27272a;border-radius:12px;padding:16px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="font-weight:600;color:#e4e4e7;">${esc(seq.recipient)}</span>
-          <span style="background:${statusColor}22;color:${statusColor};padding:2px 10px;border-radius:8px;font-size:13px;">${esc(seq.status)}</span>
+  // -- Status color mapping --
+  const statusDotColor = {
+    active: 'var(--success)',
+    completed: 'var(--accent)',
+    stopped: 'var(--warning)',
+    paused: '#f97316',
+  };
+  const statusBadgeVariant = {
+    active: 'green',
+    completed: 'blue',
+    stopped: 'yellow',
+    paused: 'orange',
+  };
+
+  // -- Build sequence rows --
+  const rowsHtml = sequences
+    .map((seq) => {
+      const dotColor = statusDotColor[seq.status] || 'var(--text-muted)';
+      const badgeVariant = statusBadgeVariant[seq.status] || 'gray';
+      const templateLabel = seq.templateId ? esc(seq.templateId) : 'One-off';
+
+      // Build step progress data
+      const stepData = seq.steps.map((step, i) => {
+        if (i < seq.currentStep) {
+          const status = step.status === 'skipped' ? 'skipped' : step.status === 'failed' ? 'failed' : 'sent';
+          return { status };
+        }
+        if (i === seq.currentStep) {
+          return { status: 'pending' };
+        }
+        return { status: 'pending' };
+      });
+      const stepProgressHtml = renderStepProgress(stepData);
+
+      // Next send time for active sequences
+      let nextSendHtml = '';
+      if (seq.status === 'active') {
+        const nextStep = seq.steps[seq.currentStep];
+        if (nextStep && nextStep.scheduledAt) {
+          nextSendHtml = `<span style="font-size:11px;color:var(--text-muted);">Next: ${esc(new Date(nextStep.scheduledAt).toLocaleString())}</span>`;
+        }
+      }
+
+      // Action buttons for active sequences only
+      let actionsHtml = '';
+      if (seq.status === 'active') {
+        actionsHtml = `
+          <button class="btn btn-danger btn-sm" data-cancel="${esc(seq.id)}" style="padding:3px 10px;font-size:11px;">Cancel</button>
+          <button class="btn btn-primary btn-sm" data-skip="${esc(seq.id)}" style="padding:3px 10px;font-size:11px;">Skip</button>`;
+      }
+
+      return `<div class="list-row" data-status="${esc(seq.status)}">
+        <div class="row-dot" style="background:${dotColor};box-shadow:0 0 6px ${dotColor}40;"></div>
+        <div style="flex:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <span style="font-weight:600;font-size:13px;">${esc(seq.recipient)}</span>
         </div>
-        <div style="color:#a1a1aa;font-size:13px;margin-bottom:4px;">Step ${esc(progress)} ${seq.templateId ? '| Template: ' + esc(seq.templateId) : '| One-off'}</div>
-        ${seq.status === 'active' && nextStep ? `<div style="color:#a1a1aa;font-size:13px;">Next send: ${esc(nextSend)}</div>` : ''}
-        <div style="color:#71717a;font-size:12px;margin-top:8px;">Created: ${esc(new Date(seq.createdAt).toLocaleString('en-US', { timeZone: seq.timezone }))}</div>
-        ${seq.status === 'active' ? `
-          <div style="margin-top:10px;display:flex;gap:8px;">
-            <button onclick="cancelSeq('${esc(seq.id)}')" style="background:#ef4444;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>
-            <button onclick="skipStepAction('${esc(seq.id)}')" style="background:#3b82f6;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;">Skip Step</button>
-          </div>
-        ` : ''}
-        ${seq.stoppedReason ? `<div style="color:#eab308;font-size:12px;margin-top:6px;">Stopped: ${esc(seq.stoppedReason)}</div>` : ''}
-      </div>
-    `;
-  }
+        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-muted);">
+          ${templateLabel}
+        </div>
+        <div style="flex:1;min-width:0;">
+          ${stepProgressHtml}
+        </div>
+        <div style="flex:1;min-width:0;text-align:center;">
+          ${nextSendHtml}
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+          ${renderBadge(seq.status, badgeVariant)}
+          ${actionsHtml}
+        </div>
+      </div>`;
+    })
+    .join('');
 
-  function renderSection(title, seqs) {
-    if (seqs.length === 0) return '';
-    return `
-      <h2 style="color:#e4e4e7;font-size:16px;margin:20px 0 10px;">${esc(title)} (${seqs.length})</h2>
-      ${seqs.map(renderSeqCard).join('')}
-    `;
-  }
+  // -- Empty state --
+  const emptyState =
+    sequences.length === 0
+      ? '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px;">No sequences yet. Create one from Gmail or the extension.</div>'
+      : '';
 
-  return `<!DOCTYPE html><html><head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Sequences - Mail Tracker</title>
-    <link rel="icon" href="${FAVICON}">
-    <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#18181b;color:#e4e4e7;font-family:system-ui,sans-serif;padding:20px;max-width:800px;margin:0 auto}
-    a{color:#818cf8;text-decoration:none}a:hover{text-decoration:underline}</style>
-  </head><body>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-      ${LOGO_SVG}
-      <span style="font-size:18px;font-weight:700;">Sequences</span>
-      <div style="margin-left:auto;display:flex;gap:12px;">
-        <a href="/">Dashboard</a>
-        <a href="/templates">Templates</a>
-        <a href="/analytics">Analytics</a>
-      </div>
+  // -- List panel --
+  const listPanel = `<div class="list-panel">
+    <div class="list-header">
+      ${filterTabsHtml}
     </div>
-    ${renderSection('Active', active)}
-    ${renderSection('Paused', paused)}
-    ${renderSection('Stopped', stopped)}
-    ${renderSection('Completed', completed)}
-    ${sequences.length === 0 ? '<p style="color:#71717a;text-align:center;margin-top:40px;">No sequences yet. Create one from Gmail or the extension.</p>' : ''}
-    <script>
-      function cancelSeq(id) { if (confirm('Cancel this sequence?')) fetch('/sequences/' + id, { method: 'DELETE' }).then(() => location.reload()); }
-      function skipStepAction(id) { if (confirm('Skip current step?')) fetch('/sequences/' + id + '/skip', { method: 'POST' }).then(() => location.reload()); }
-    </script>
-  </body></html>`;
+    <div class="list-cols">
+      <span style="width:8px"></span>
+      <span style="flex:2">Recipient</span>
+      <span style="flex:1">Template</span>
+      <span style="flex:1">Progress</span>
+      <span style="flex:1;text-align:center">Next Send</span>
+      <span style="flex-shrink:0;width:160px;text-align:right">Status</span>
+    </div>
+    <div class="list-body" id="seqList">
+      ${rowsHtml}
+      ${emptyState}
+    </div>
+  </div>`;
+
+  const bodyHtml = `
+    <div style="padding:0 32px 32px;">
+      <div style="margin-top:16px;">${listPanel}</div>
+    </div>`;
+
+  // -- Client-side scripts --
+  const scripts = `
+    var SEQUENCES = ${safeJson(sequences)};
+
+    /* Filter tab switching */
+    document.querySelectorAll('.filter-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        var filterKey = tab.getAttribute('data-filter');
+        var rows = document.querySelectorAll('.list-row');
+        rows.forEach(function(row) {
+          if (filterKey === 'all' || row.getAttribute('data-status') === filterKey) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    });
+
+    /* Cancel sequence */
+    document.querySelectorAll('[data-cancel]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var seqId = btn.getAttribute('data-cancel');
+        if (confirm('Cancel this sequence?')) {
+          fetch('/sequences/' + encodeURIComponent(seqId), { method: 'DELETE' })
+            .then(function() { location.reload(); });
+        }
+      });
+    });
+
+    /* Skip step */
+    document.querySelectorAll('[data-skip]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var seqId = btn.getAttribute('data-skip');
+        if (confirm('Skip the current step?')) {
+          fetch('/sequences/' + encodeURIComponent(seqId) + '/skip', { method: 'POST' })
+            .then(function() { location.reload(); });
+        }
+      });
+    });
+  `;
+
+  const subtitle =
+    counts.all + ' sequence' + (counts.all !== 1 ? 's' : '') + ' total';
+
+  return renderLayout({
+    title: 'Sequences',
+    subtitle,
+    activePage: 'sequences',
+    headerActions: '',
+    bodyHtml,
+    scripts,
+    oauthConnected,
+  });
 }
