@@ -544,12 +544,14 @@
 
     const container = document.createElement('div');
     container.setAttribute('data-sequence-selector', 'true');
-    container.style.cssText = 'display:inline-flex;align-items:center;position:relative;margin-left:4px;';
+    // Match Gmail's toolbar icon container (wG J-Z-I class pattern)
+    container.style.cssText = 'display:inline-flex;align-items:center;position:relative;';
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    // Style to match Gmail's toolbar icons — transparent bg, subtle hover
-    btn.style.cssText = 'background:transparent;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background 0.15s;';
+    const btn = document.createElement('div');
+    // Match Gmail toolbar icon sizing and behavior
+    btn.style.cssText = 'width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:5px;border-radius:50%;transition:background 0.15s;';
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('tabindex', '1');
     btn.title = 'Select sequence';
     btn.setAttribute('data-selected-template', '');
 
@@ -690,31 +692,27 @@
     container.appendChild(btn);
     container.appendChild(dropdown);
 
-    // Strategy: Find Gmail's compose toolbar row (the icons row with Aa, attach, emoji, etc.)
-    // This is a separate td/div from the Send button, in the same bottom area.
-    // Try multiple selectors since Gmail's classes change:
-    const composeToolbar =
-      composeForm.querySelector('.btC td.gU') ||        // Classic Gmail toolbar cell
-      composeForm.querySelector('.aDh') ||               // Another toolbar container
-      composeForm.querySelector('[command="Files"]')?.closest('div') || // Near attach button
-      composeForm.querySelector('div[aria-label*="more options"]')?.parentElement || // Near "more options"
-      null;
-
-    if (composeToolbar) {
-      // Place in the toolbar row alongside other icons
-      composeToolbar.appendChild(container);
+    // Place in Gmail's compose toolbar (div.bAK) — the row with attach, link, emoji icons.
+    // This is in a separate td from the Send button, so no overlap.
+    const toolbarDiv = composeForm.querySelector('div.bAK');
+    if (toolbarDiv) {
+      toolbarDiv.appendChild(container);
     } else {
-      // Fallback: place in the same table row as Send, but in a new cell or after Send's parent
+      // Fallback: find the toolbar td (td.a8X) or the td after Send's td
       const sendTd = sendButton.closest('td');
-      if (sendTd && sendTd.nextElementSibling) {
-        // Insert into the next cell (typically the toolbar cell)
-        sendTd.nextElementSibling.appendChild(container);
+      const toolbarTd = composeForm.querySelector('td.a8X') ||
+                        (sendTd ? sendTd.nextElementSibling?.nextElementSibling?.nextElementSibling : null);
+      if (toolbarTd) {
+        const innerDiv = toolbarTd.querySelector('div') || toolbarTd;
+        innerDiv.appendChild(container);
       } else {
-        // Last resort: after Send button with spacing
+        // Last resort: after Send's parent td with separator
         container.style.marginLeft = '8px';
         container.style.borderLeft = '1px solid #dadce0';
         container.style.paddingLeft = '8px';
-        sendButton.parentElement.appendChild(container);
+        if (sendTd && sendTd.parentElement) {
+          sendTd.parentElement.appendChild(container);
+        }
       }
     }
   }
