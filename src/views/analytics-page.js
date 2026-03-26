@@ -1,76 +1,100 @@
-import { esc, FAVICON, LOGO_SVG } from '../shared.js';
+import { esc } from '../shared.js';
+import { renderLayout } from './layout.js';
+import { renderStatCard } from './components.js';
 
-export function renderAnalyticsPage(analyticsData, templates) {
-  var templateNames = {};
-  for (var i = 0; i < templates.length; i++) {
+/**
+ * Renders the analytics page using the shared design system.
+ *
+ * @param {Array} analyticsData - Array of analytics objects (one per template)
+ * @param {Array} templates - Array of template objects with id and name
+ * @param {boolean} oauthConnected - Whether Gmail OAuth is connected
+ * @returns {string} Complete HTML page
+ */
+export function renderAnalyticsPage(analyticsData, templates, oauthConnected) {
+  // Build template name lookup map
+  const templateNames = {};
+  for (let i = 0; i < templates.length; i++) {
     templateNames[templates[i].id] = templates[i].name;
   }
 
-  function renderAnalyticsCard(analytics) {
-    var name = templateNames[analytics.templateId] || analytics.templateId;
+  let bodyHtml;
 
-    var stepsHtml = analytics.steps.map(function(s, i) {
-      return '<tr>' +
-        '<td style="padding:6px 12px;">Step ' + (i + 1) + '</td>' +
-        '<td style="padding:6px 12px;text-align:center;">' + s.sent + '</td>' +
-        '<td style="padding:6px 12px;text-align:center;">' + s.opened + '</td>' +
-        '<td style="padding:6px 12px;text-align:center;">' + (s.openRate * 100).toFixed(0) + '%</td>' +
-        '<td style="padding:6px 12px;text-align:center;">' + s.replied + '</td>' +
-        '<td style="padding:6px 12px;text-align:center;">' + (s.replyRate * 100).toFixed(0) + '%</td>' +
-        '</tr>';
-    }).join('');
+  if (analyticsData.length === 0) {
+    bodyHtml = `
+      <div style="padding:0 32px 32px;">
+        <p style="color:var(--text-muted);text-align:center;margin-top:60px;font-size:14px;">
+          No analytics data yet
+        </p>
+      </div>`;
+  } else {
+    const cards = analyticsData.map((analytics) => {
+      const name = templateNames[analytics.templateId] || analytics.templateId;
+      const maxSent = Math.max(
+        ...analytics.steps.map((s) => s.sent),
+        1,
+      );
 
-    var maxSent = Math.max.apply(null, analytics.steps.map(function(s) { return s.sent; }).concat([1]));
-    var funnelHtml = analytics.steps.map(function(s, i) {
-      var width = Math.max((s.sent / maxSent) * 100, 5);
-      return '<div style="display:flex;align-items:center;gap:10px;margin:4px 0;">' +
-        '<span style="color:#a1a1aa;font-size:12px;width:50px;">Step ' + (i + 1) + '</span>' +
-        '<div style="background:#6366f133;border-radius:4px;height:24px;width:' + width + '%;display:flex;align-items:center;padding:0 8px;">' +
-        '<span style="color:#a5b4fc;font-size:12px;">' + s.sent + ' sent</span>' +
-        '</div></div>';
-    }).join('');
+      // Funnel bar chart
+      const funnelHtml = analytics.steps
+        .map((s, i) => {
+          const widthPct = Math.max((s.sent / maxSent) * 100, 5);
+          return `<div style="display:flex;align-items:center;gap:10px;margin:4px 0;">
+          <span style="color:var(--text-secondary);font-size:12px;width:50px;flex-shrink:0;">Step ${i + 1}</span>
+          <div style="background:linear-gradient(90deg,rgba(59,130,246,0.25),rgba(96,165,250,0.15));border-radius:4px;height:24px;width:${widthPct}%;display:flex;align-items:center;padding:0 8px;">
+            <span style="color:var(--accent-light);font-size:12px;">${esc(String(s.sent))} sent</span>
+          </div>
+        </div>`;
+        })
+        .join('');
 
-    return `
-      <div style="background:#27272a;border-radius:12px;padding:20px;margin-bottom:16px;">
-        <h3 style="color:#e4e4e7;font-size:16px;margin-bottom:12px;">${esc(name)}</h3>
-        <div style="display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap;">
-          <div style="background:#3f3f46;border-radius:8px;padding:10px 16px;"><div style="color:#71717a;font-size:12px;">Total</div><div style="color:#e4e4e7;font-size:20px;font-weight:600;">${analytics.totalSequences}</div></div>
-          <div style="background:#3f3f46;border-radius:8px;padding:10px 16px;"><div style="color:#71717a;font-size:12px;">Completed</div><div style="color:#22c55e;font-size:20px;font-weight:600;">${analytics.completedSequences}</div></div>
-          <div style="background:#3f3f46;border-radius:8px;padding:10px 16px;"><div style="color:#71717a;font-size:12px;">Stopped</div><div style="color:#eab308;font-size:20px;font-weight:600;">${analytics.stoppedSequences}</div></div>
+      // Stats table rows
+      const tableRows = analytics.steps
+        .map((s, i) => {
+          const openRate = (s.openRate * 100).toFixed(0);
+          const replyRate = (s.replyRate * 100).toFixed(0);
+          return `<tr style="border-bottom:1px solid var(--border-subtle);">
+          <td style="padding:8px 12px;color:var(--text-primary);font-size:13px;">Step ${i + 1}</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--text-primary);font-size:13px;">${esc(String(s.sent))}</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--text-primary);font-size:13px;">${esc(String(s.opened))}</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--text-primary);font-size:13px;">${esc(openRate)}%</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--text-primary);font-size:13px;">${esc(String(s.replied))}</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--text-primary);font-size:13px;">${esc(replyRate)}%</td>
+        </tr>`;
+        })
+        .join('');
+
+      return `<div class="panel" style="margin-bottom:16px;">
+        <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:14px;">${esc(name)}</h3>
+        <div class="stat-grid" style="margin-bottom:16px;">
+          ${renderStatCard({ label: 'Total Sequences', value: String(analytics.totalSequences) })}
+          ${renderStatCard({ label: 'Completed', value: String(analytics.completedSequences) })}
+          ${renderStatCard({ label: 'Stopped', value: String(analytics.stoppedSequences) })}
         </div>
         <div style="margin-bottom:16px;">${funnelHtml}</div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="color:#71717a;border-bottom:1px solid #3f3f46;">
-            <th style="padding:6px 12px;text-align:left;">Step</th>
-            <th style="padding:6px 12px;">Sent</th>
-            <th style="padding:6px 12px;">Opened</th>
-            <th style="padding:6px 12px;">Open Rate</th>
-            <th style="padding:6px 12px;">Replied</th>
-            <th style="padding:6px 12px;">Reply Rate</th>
-          </tr></thead>
-          <tbody style="color:#e4e4e7;">${stepsHtml}</tbody>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:8px 12px;text-align:left;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Step</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Sent</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Opened</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Open Rate</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Replied</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Reply Rate</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
         </table>
-      </div>
-    `;
+      </div>`;
+    });
+
+    bodyHtml = `<div style="padding:0 32px 32px;">${cards.join('')}</div>`;
   }
 
-  return `<!DOCTYPE html><html><head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Analytics - Mail Tracker</title>
-    <link rel="icon" href="${FAVICON}">
-    <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#18181b;color:#e4e4e7;font-family:system-ui,sans-serif;padding:20px;max-width:900px;margin:0 auto}
-    a{color:#818cf8;text-decoration:none}a:hover{text-decoration:underline}</style>
-  </head><body>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-      ${LOGO_SVG}
-      <span style="font-size:18px;font-weight:700;">Sequence Analytics</span>
-      <div style="margin-left:auto;display:flex;gap:12px;">
-        <a href="/">Dashboard</a>
-        <a href="/sequences">Sequences</a>
-        <a href="/templates">Templates</a>
-      </div>
-    </div>
-    ${analyticsData.map(renderAnalyticsCard).join('')}
-    ${analyticsData.length === 0 ? '<p style="color:#71717a;text-align:center;margin-top:40px;">No analytics data yet. Analytics appear after sequences start sending.</p>' : ''}
-  </body></html>`;
+  return renderLayout({
+    title: 'Analytics',
+    subtitle: 'Sequence performance',
+    activePage: 'analytics',
+    bodyHtml,
+    oauthConnected,
+  });
 }
