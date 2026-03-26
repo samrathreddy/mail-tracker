@@ -147,20 +147,27 @@ export function renderLayout(opts) {
       border-right: 1px solid rgba(148,163,184,0.06);
       display: flex;
       flex-direction: column;
-      padding: 12px 8px;
+      align-items: center;
+      padding: 12px 0;
       transition: width 0.2s ease;
       overflow: hidden;
     }
     nav.sidebar:hover {
       width: 200px;
+      align-items: stretch;
+      padding: 12px 8px;
     }
 
     .sidebar-logo {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 10px;
       padding: 4px 6px;
       margin-bottom: 16px;
+    }
+    nav.sidebar:hover .sidebar-logo {
+      justify-content: flex-start;
     }
     .sidebar-logo-icon {
       width: 28px;
@@ -188,26 +195,38 @@ export function renderLayout(opts) {
     .nav-item {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 10px;
-      padding: 8px 10px;
+      padding: 8px 0;
       border-radius: 8px;
       text-decoration: none;
       color: #8896b3;
       transition: background 0.15s, color 0.15s;
       margin-bottom: 2px;
       white-space: nowrap;
+      position: relative;
+    }
+    nav.sidebar:hover .nav-item {
+      justify-content: flex-start;
+      padding: 8px 10px;
     }
     .nav-item:hover {
       background: rgba(255,255,255,0.04);
     }
     .nav-item.active {
-      background: rgba(59,130,246,0.1);
+      background: rgba(59,130,246,0.12);
       color: #60a5fa;
+    }
+    nav.sidebar:hover .nav-item.active {
+      border-left: 3px solid #3b82f6;
+      border-radius: 0 8px 8px 0;
+      padding-left: 7px;
     }
 
     .nav-icon {
       width: 34px;
       height: 34px;
+      min-width: 34px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -255,9 +274,14 @@ export function renderLayout(opts) {
     .sidebar-status {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 10px;
-      padding: 8px 10px;
+      padding: 8px 0;
       border-radius: 8px;
+    }
+    nav.sidebar:hover .sidebar-status {
+      justify-content: flex-start;
+      padding: 8px 10px;
     }
     .sidebar-status-dot {
       width: 6px;
@@ -288,24 +312,27 @@ export function renderLayout(opts) {
       margin-left: 56px;
       flex: 1;
       min-height: 100vh;
+      background: var(--bg-base);
+      padding: 0;
     }
     .page-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 24px 32px 16px;
-      border-bottom: 1px solid #27272a;
+      padding-left: 32px;
+      border-bottom: 1px solid var(--border);
     }
     .page-header-left h1 {
       font-size: 1.25rem;
       font-weight: 700;
       letter-spacing: -0.02em;
-      color: #fafafa;
+      color: var(--text-primary);
       margin: 0;
     }
     .page-header-left p {
       font-size: 0.8rem;
-      color: #71717a;
+      color: var(--text-secondary);
       margin: 4px 0 0 0;
     }
     .page-header-actions {
