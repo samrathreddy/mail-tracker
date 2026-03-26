@@ -9,10 +9,17 @@
       min-height: 200px;
       max-height: 560px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0c0c0c;
-      color: #e0e0e0;
+      background: #18181b;
+      color: #e4e4e7;
       font-size: 13px;
       overflow-y: auto;
+    }
+
+    /* Top accent bar */
+    .top-accent {
+      height: 3px;
+      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      flex-shrink: 0;
     }
 
     /* Header */
@@ -21,10 +28,10 @@
       align-items: center;
       justify-content: space-between;
       padding: 14px 16px 10px;
-      border-bottom: 1px solid #1a1a1a;
+      border-bottom: 1px solid #27272a;
       position: sticky;
       top: 0;
-      background: #0c0c0c;
+      background: #18181b;
       z-index: 10;
     }
     .header h1 {
@@ -44,30 +51,67 @@
     .btn {
       padding: 6px 12px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
     }
+    .btn:active { transform: scale(0.97); }
     .btn-primary {
-      background: #2563eb;
+      background: #3b82f6;
       color: #fff;
     }
-    .btn-primary:hover { background: #3b82f6; }
+    .btn-primary:hover { background: #60a5fa; }
     .btn-ghost {
       background: transparent;
-      color: #888;
+      color: #a1a1aa;
       padding: 6px 8px;
     }
-    .btn-ghost:hover { color: #fff; background: #1a1a1a; }
+    .btn-ghost:hover { color: #fff; background: #27272a; }
     .btn-danger {
       background: transparent;
-      color: #666;
+      color: #71717a;
       padding: 4px 6px;
       font-size: 11px;
     }
     .btn-danger:hover { color: #ef4444; }
+
+    /* Tab bar */
+    #tab-bar {
+      display: flex;
+      gap: 0;
+      padding: 0 12px;
+      background: #18181b;
+      border-bottom: 1px solid #27272a;
+      position: relative;
+    }
+    .tab-btn {
+      background: transparent;
+      color: #71717a;
+      border: none;
+      padding: 10px 16px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.25s;
+      position: relative;
+    }
+    .tab-btn:hover { color: #a1a1aa; }
+    .tab-btn.active {
+      color: #e4e4e7;
+      border-bottom-color: #3b82f6;
+    }
+
+    /* View transitions */
+    .view-fade {
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
     /* Setup screen */
     .setup {
@@ -75,38 +119,39 @@
       text-align: center;
     }
     .setup p {
-      color: #888;
+      color: #a1a1aa;
       margin: 8px 0 20px;
       line-height: 1.5;
     }
     .setup input {
       width: 100%;
       padding: 10px 12px;
-      background: #161616;
-      border: 1px solid #2a2a2a;
+      background: #27272a;
+      border: 1px solid #3f3f46;
       border-radius: 8px;
       color: #fff;
       font-size: 13px;
       outline: none;
       margin-bottom: 12px;
+      transition: border-color 0.2s;
     }
-    .setup input:focus { border-color: #2563eb; }
+    .setup input:focus { border-color: #3b82f6; }
     .setup .btn { width: 100%; padding: 10px; }
     .toggle-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 0;
-      border-top: 1px solid #1a1a1a;
-      margin-top: 16px;
+      padding: 14px 0;
+      border-top: 1px solid #27272a;
+      margin-top: 20px;
     }
     .toggle-row label {
       font-size: 13px;
-      color: #ccc;
+      color: #e4e4e7;
     }
     .toggle-row .sub {
       font-size: 11px;
-      color: #555;
+      color: #71717a;
       margin-top: 2px;
     }
     .toggle {
@@ -119,7 +164,7 @@
     .toggle .slider {
       position: absolute;
       inset: 0;
-      background: #333;
+      background: #3f3f46;
       border-radius: 11px;
       cursor: pointer;
       transition: background 0.2s;
@@ -135,7 +180,7 @@
       left: 3px;
       transition: transform 0.2s;
     }
-    .toggle input:checked + .slider { background: #2563eb; }
+    .toggle input:checked + .slider { background: #3b82f6; }
     .toggle input:checked + .slider::before { transform: translateX(18px); }
     .detail-recipient {
       padding: 0 16px 8px;
@@ -151,11 +196,16 @@
       display: flex;
       align-items: center;
       padding: 10px 16px;
-      border-bottom: 1px solid #141414;
+      margin: 0 8px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: background 0.1s;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
-    .pixel-item:hover { background: #141414; }
+    .pixel-item:hover {
+      background: #27272a;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
     .pixel-info { flex: 1; min-width: 0; }
     .pixel-id {
       font-family: 'SF Mono', 'Fira Code', monospace;
@@ -165,7 +215,7 @@
     }
     .pixel-meta {
       font-size: 11px;
-      color: #555;
+      color: #71717a;
       margin-top: 2px;
     }
     .pixel-recipient {
@@ -176,33 +226,46 @@
       text-overflow: ellipsis;
     }
     .pixel-opens {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 700;
-      color: #34d399;
       margin-right: 12px;
-      min-width: 28px;
+      min-width: 32px;
       text-align: right;
+      transition: color 0.2s;
     }
+    .pixel-opens.has-opens { color: #22c55e; }
+    .pixel-opens.no-opens { color: #3f3f46; }
     .pixel-actions {
       display: flex;
       gap: 2px;
       margin-left: 8px;
     }
 
+    /* Sequence progress badge */
+    .seq-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
     /* Detail view */
     .detail {
       display: none;
     }
-    .detail.active { display: block; }
+    .detail.active { display: block; animation: fadeIn 0.2s ease; }
     .detail-header {
       display: flex;
       align-items: center;
       padding: 14px 16px 10px;
-      border-bottom: 1px solid #1a1a1a;
+      border-bottom: 1px solid #27272a;
       gap: 10px;
       position: sticky;
       top: 0;
-      background: #0c0c0c;
+      background: #18181b;
       z-index: 10;
     }
     .detail-header h2 {
@@ -217,17 +280,17 @@
       gap: 8px;
       padding: 12px 16px;
     }
-    .stat-card .value.orange { color: #fb923c; }
-    .stat-card .value.blue { color: #60a5fa; }
     .stat-card {
-      background: #141414;
-      border-radius: 8px;
+      background: #27272a;
+      border-radius: 10px;
       padding: 12px;
+      transition: background 0.2s;
     }
+    .stat-card:hover { background: #3f3f46; }
     .stat-card label {
       font-size: 10px;
       text-transform: uppercase;
-      color: #555;
+      color: #71717a;
       letter-spacing: 0.5px;
     }
     .stat-card .value {
@@ -236,7 +299,9 @@
       color: #fff;
       margin-top: 4px;
     }
-    .stat-card .value.green { color: #34d399; }
+    .stat-card .value.green { color: #22c55e; }
+    .stat-card .value.orange { color: #fb923c; }
+    .stat-card .value.blue { color: #60a5fa; }
 
     /* Snippet box */
     .snippet-section {
@@ -244,32 +309,32 @@
     }
     .snippet-label {
       font-size: 11px;
-      color: #555;
+      color: #71717a;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 6px;
     }
     .snippet-box {
-      background: #141414;
-      border: 1px solid #1e1e1e;
-      border-radius: 6px;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
       padding: 8px 10px;
       font-family: monospace;
       font-size: 11px;
-      color: #a0a0a0;
+      color: #a1a1aa;
       word-break: break-all;
       cursor: pointer;
       position: relative;
-      transition: border-color 0.15s;
+      transition: border-color 0.2s, background 0.2s;
     }
-    .snippet-box:hover { border-color: #2563eb; }
+    .snippet-box:hover { border-color: #3b82f6; background: #3f3f46; }
     .snippet-box .copy-hint {
       position: absolute;
       top: 50%;
       right: 8px;
       transform: translateY(-50%);
       font-size: 10px;
-      color: #444;
+      color: #71717a;
       font-family: -apple-system, sans-serif;
     }
 
@@ -280,23 +345,25 @@
     .events-section h3 {
       font-size: 11px;
       text-transform: uppercase;
-      color: #555;
+      color: #71717a;
       letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
     .event-item {
-      background: #141414;
-      border-radius: 6px;
+      background: #27272a;
+      border-radius: 8px;
       padding: 8px 10px;
       margin-bottom: 4px;
       font-size: 11px;
+      transition: background 0.15s;
     }
+    .event-item:hover { background: #3f3f46; }
     .event-item .event-time {
       color: #60a5fa;
       font-weight: 500;
     }
     .event-item .event-detail {
-      color: #555;
+      color: #71717a;
       margin-top: 2px;
     }
 
@@ -304,9 +371,9 @@
     .empty {
       text-align: center;
       padding: 40px 20px;
-      color: #444;
+      color: #71717a;
     }
-    .empty p { margin-top: 8px; font-size: 12px; }
+    .empty p { margin-top: 8px; font-size: 12px; color: #a1a1aa; }
 
     /* Toast */
     .toast {
@@ -314,23 +381,23 @@
       bottom: 12px;
       left: 50%;
       transform: translateX(-50%) translateY(60px);
-      background: #2563eb;
+      background: #3b82f6;
       color: #fff;
       padding: 8px 16px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: 500;
-      transition: transform 0.2s ease;
+      transition: transform 0.25s ease;
       z-index: 100;
       pointer-events: none;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* Loading */
+    /* Loading / skeleton */
     .loading {
       text-align: center;
       padding: 40px;
-      color: #444;
+      color: #71717a;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
@@ -338,15 +405,66 @@
     .spinner {
       width: 20px;
       height: 20px;
-      border: 2px solid #222;
-      border-top-color: #2563eb;
+      border: 2px solid #27272a;
+      border-top-color: #3b82f6;
       border-radius: 50%;
       animation: spin 0.6s linear infinite;
       margin: 0 auto 10px;
     }
+
+    /* Skeleton pulse for loading states */
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    .skeleton-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      gap: 12px;
+    }
+    .skeleton-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #27272a;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .skeleton-lines { flex: 1; }
+    .skeleton-line {
+      height: 10px;
+      border-radius: 4px;
+      background: #27272a;
+      animation: pulse 1.5s ease-in-out infinite;
+      margin-bottom: 6px;
+    }
+    .skeleton-line:last-child { margin-bottom: 0; width: 60%; }
+
+    /* Timeline expand transition */
+    .timeline-collapse {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+    }
+    .timeline-collapse.expanded {
+      max-height: 500px;
+    }
+
+    /* Settings branding footer */
+    .settings-footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #27272a;
+      text-align: center;
+      color: #3f3f46;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
+  <!-- Top accent bar -->
+  <div class="top-accent"></div>
+
   <!-- Main List View -->
   <div id="list-view">
     <div class="header">
@@ -356,10 +474,10 @@
         <button class="btn btn-primary" id="new-btn">+ Manual</button>
       </div>
     </div>
-    <div id="tab-bar" style="display:flex;gap:4px;padding:8px 12px;background:#18181b;border-bottom:1px solid #27272a;">
-      <button class="tab-btn active" data-tab="list" style="background:#27272a;color:#e4e4e7;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Trackers</button>
-      <button class="tab-btn" data-tab="sequences" style="background:transparent;color:#71717a;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Sequences</button>
-      <button class="tab-btn" data-tab="templates" style="background:transparent;color:#71717a;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Templates</button>
+    <div id="tab-bar">
+      <button class="tab-btn active" data-tab="list">Trackers</button>
+      <button class="tab-btn" data-tab="sequences">Sequences</button>
+      <button class="tab-btn" data-tab="templates">Templates</button>
     </div>
     <div id="pixel-container">
       <div class="loading"><div class="spinner"></div>Loading...</div>
@@ -383,7 +501,7 @@
       </div>
       <div class="stat-card">
         <label>Last Open</label>
-        <div class="value" id="detail-last" style="font-size:13px;">—</div>
+        <div class="value" id="detail-last" style="font-size:13px;">&#8212;</div>
       </div>
       <div class="stat-card">
         <label>Filtered</label>
@@ -391,7 +509,7 @@
       </div>
       <div class="stat-card">
         <label>Sender Protection</label>
-        <div class="value blue" id="detail-protection" style="font-size:13px;">—</div>
+        <div class="value blue" id="detail-protection" style="font-size:13px;">&#8212;</div>
       </div>
     </div>
     <div class="snippet-section">
@@ -422,12 +540,12 @@
       <p>Enter your Mail Tracker server URL (your Cloudflare Worker URL)</p>
       <input type="url" id="server-input" placeholder="https://mail-tracker.yourname.workers.dev" />
       <input type="password" id="password-input" placeholder="Dashboard password (optional)" />
-      <div id="oauth-status" style="margin-bottom:16px;padding:12px;background:#27272a;border-radius:10px;">
+      <div id="oauth-status" style="margin-bottom:16px;padding:14px;background:#27272a;border-radius:10px;border:1px solid #3f3f46;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span style="color:#a1a1aa;font-size:13px;">Gmail API</span>
-          <span id="oauth-indicator" style="font-size:13px;color:#71717a;">Checking...</span>
+          <span id="oauth-indicator" style="font-size:12px;color:#71717a;padding:2px 8px;border-radius:20px;background:#3f3f46;">Checking...</span>
         </div>
-        <button id="oauth-btn" style="margin-top:8px;background:#6366f1;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;width:100%;display:none;">Connect Gmail</button>
+        <button id="oauth-btn" style="margin-top:10px;background:#6366f1;color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;width:100%;display:none;transition:background 0.2s,transform 0.15s;">Connect Gmail</button>
       </div>
       <button class="btn btn-primary" id="save-btn">Save & Connect</button>
       <p id="setup-error" style="color:#ef4444;margin-top:12px;display:none;"></p>
@@ -436,11 +554,12 @@
           <label>Auto-track Gmail</label>
           <div class="sub">Auto-track when you Send in Gmail</div>
         </div>
-        <div class="toggle">
+        <label class="toggle" for="auto-track-toggle">
           <input type="checkbox" id="auto-track-toggle" checked />
           <span class="slider"></span>
-        </div>
+        </label>
       </div>
+      <div class="settings-footer">Mail Tracker v1.0</div>
     </div>
   </div>
 
