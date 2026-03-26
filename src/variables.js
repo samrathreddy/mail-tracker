@@ -12,13 +12,32 @@ export function deriveFirstName(email) {
 }
 
 /**
+ * Derive a company name from an email domain.
+ * Strips common TLDs and capitalizes.
+ * e.g. "bob@acme.com" -> "Acme"
+ * e.g. "alice@big-corp.io" -> "Big Corp"
+ * e.g. "user@gmail.com" -> "Gmail" (generic providers pass through)
+ */
+export function deriveCompany(email) {
+  if (!email || !email.includes('@')) return '';
+  const domain = email.split('@')[1];
+  // Take the domain name without TLD
+  const parts = domain.split('.');
+  const name = parts.length > 1 ? parts.slice(0, -1).join('.') : parts[0];
+  // Replace hyphens/dots with spaces and capitalize each word
+  return name
+    .replace(/[-_.]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
  * Substitute {{variables}} and {{spin|syntax|options}} in a string.
  *
  * Two patterns supported inside {{ }}:
  *   {{variableName}}         — replaced with the variable value (built-in or custom)
  *   {{option1|option2|...}}  — one option picked at random (spintax)
  *
- * Built-in variables: firstName, recipient, subject, originalBody, daysSince, stepNumber.
+ * Built-in variables: firstName, company, recipient, subject, originalBody, daysSince, stepNumber.
  * Custom variables from the `variables` object override built-ins.
  * Unknown single-word variables are left as-is so misconfiguration is visible.
  */
@@ -31,6 +50,7 @@ export function substituteVariables(text, context) {
 
   const builtIns = {
     firstName: deriveFirstName(recipient),
+    company: deriveCompany(recipient),
     recipient: recipient || '',
     subject: subject || '',
     originalBody: originalBody || '',

@@ -851,6 +851,7 @@ function buildClientScripts(template) {
 
     var VARIABLES = [
       { name: 'firstName', desc: "Recipient's first name" },
+      { name: 'company', desc: "Recipient's company name" },
       { name: 'recipient', desc: 'Full email address' },
       { name: 'subject', desc: 'Original email subject' },
       { name: 'originalBody', desc: 'Body preview' },
@@ -860,6 +861,7 @@ function buildClientScripts(template) {
 
     var SAMPLE_DATA = {
       firstName: 'Alice',
+      company: 'Acme',
       recipient: 'alice@acme.com',
       subject: 'Partnership proposal',
       originalBody: 'Hi, I wanted to discuss a potential partnership...',

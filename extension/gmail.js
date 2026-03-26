@@ -705,14 +705,18 @@
       if (subEl) subject = subEl.value || '';
     }
     var firstName = recipient.split('@')[0] || '';
-    // Capitalize first letter
     firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-    return { recipient: recipient, subject: subject, firstName: firstName };
+    var domain = recipient.includes('@') ? recipient.split('@')[1] : '';
+    var companyParts = domain.split('.');
+    var company = companyParts.length > 1 ? companyParts.slice(0, -1).join(' ') : companyParts[0] || '';
+    company = company.replace(/[-_]/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    return { recipient: recipient, subject: subject, firstName: firstName, company: company };
   }
 
   function _substituteVariables(text, data) {
     return text
       .replace(/\{\{firstName\}\}/g, data.firstName)
+      .replace(/\{\{company\}\}/g, data.company || '')
       .replace(/\{\{subject\}\}/g, data.subject)
       .replace(/\{\{daysSince\}\}/g, '0');
   }
@@ -762,7 +766,7 @@
     // Variable pills row
     var pillRow = document.createElement('div');
     pillRow.style.cssText = 'display:flex;gap:4px;margin-bottom:4px;flex-wrap:wrap;';
-    var variables = ['{{firstName}}', '{{subject}}', '{{daysSince}}'];
+    var variables = ['{{firstName}}', '{{company}}', '{{subject}}', '{{daysSince}}'];
     var bodyTextarea = document.createElement('textarea');
     variables.forEach(function(v) {
       var pill = document.createElement('button');
