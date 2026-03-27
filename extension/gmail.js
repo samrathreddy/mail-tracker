@@ -822,7 +822,12 @@
       composeForm.querySelector('[contenteditable="true"]');
     var bodyHtml = bodyEl ? bodyEl.innerHTML : '';
 
-    var text = bodyHtml.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    // Strip Gmail signature from analysis (content after -- delimiter or inside .gmail_signature)
+    var cleanHtml = bodyHtml
+      .replace(/<div[^>]*class="[^"]*gmail_signature[^"]*"[^>]*>[\s\S]*$/i, '')  // Gmail signature div
+      .replace(/(<br\s*\/?>|\s)*--\s*(<br\s*\/?>)[\s\S]*$/i, '');                 // -- delimiter and everything after
+
+    var text = cleanHtml.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
     var fullText = (subject + ' ' + text).toLowerCase();
 
     var plainText = fullText.replace(/\{\{([^}]*)\}\}/g, function(m, inner) {
@@ -837,10 +842,11 @@
     var orangeFound = findSpamWords(fullText, SPAM_ORANGE);
     var yellowFound = findSpamWords(fullText, SPAM_YELLOW);
 
-    var linkCount = (bodyHtml.match(/<a\b/gi) || []).length;
+    // Count links/images only in the email body (excluding signature)
+    var linkCount = (cleanHtml.match(/<a\b/gi) || []).length;
     var urlsInText = text.match(/https?:\/\/\S+/gi) || [];
     linkCount += urlsInText.length;
-    var imageCount = (bodyHtml.match(/<img\b/gi) || []).length;
+    var imageCount = (cleanHtml.match(/<img\b/gi) || []).length;
     var emojiCount;
     try {
       var emojiMatches = text.match(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu);
@@ -851,11 +857,14 @@
     score += redFound.length * 10;
     score += orangeFound.length * 5;
     score += yellowFound.length * 2;
-    score += Math.max(0, linkCount * 15);
+    // Links: first link is free, 2nd adds 5, 3+ adds 10 each
+    if (linkCount >= 3) score += 10 + (linkCount - 2) * 10;
+    else if (linkCount === 2) score += 5;
     score += Math.max(0, imageCount * 10);
     score += Math.max(0, (emojiCount - 1) * 5);
-    if (wordCount < 25 || wordCount > 100) score += 10;
-    if (spintaxPercent < 5) score += 10;
+    if (wordCount < 15 || wordCount > 150) score += 10;
+    else if (wordCount < 25 || wordCount > 100) score += 5;
+    if (spintaxPercent < 5 && wordCount > 10) score += 10;
     score = Math.min(100, score);
 
     return {
