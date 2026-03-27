@@ -466,7 +466,9 @@ export async function getRecipientInfo(env, email, defaultTimezone) {
 
   if (env.SEQUENCES) {
     const cached = await env.SEQUENCES.get(cacheKey, 'json');
-    if (cached) return cached;
+    // Return cache hit only if it has a valid non-default timezone
+    // (stale cache from before country inference may have wrong timezone)
+    if (cached && cached.timezoneSource !== 'default') return cached;
   }
 
   const trackers = env.TRACKER ? await loadAllTrackers(env) : [];
