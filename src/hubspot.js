@@ -165,7 +165,12 @@ export async function lookupRecipient(env, email) {
 
     let tz = props.hs_timezone || props.hs_time_zone || '';
     tz = HUBSPOT_TZ_ALIASES[tz] || tz;
-    const timezone = tz && isValidIanaTimezone(tz) ? tz : null;
+    let timezone = tz && isValidIanaTimezone(tz) ? tz : null;
+
+    // If no hs_timezone, infer from country (+ city for large countries)
+    if (!timezone && props.country) {
+      timezone = inferTimezoneFromCountry(props.country, props.city, props.state);
+    }
 
     return {
       timezone,
@@ -181,6 +186,136 @@ export async function lookupRecipient(env, email) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Infer timezone from country name (+ city/state for large countries with multiple zones).
+ */
+function inferTimezoneFromCountry(country, city, state) {
+  if (!country) return null;
+  const c = country.toLowerCase().trim();
+  const ci = (city || '').toLowerCase().trim();
+  const st = (state || '').toLowerCase().trim();
+
+  // Single-timezone countries
+  const COUNTRY_TZ = {
+    'india': 'Asia/Kolkata',
+    'japan': 'Asia/Tokyo',
+    'south korea': 'Asia/Seoul',
+    'china': 'Asia/Shanghai',
+    'singapore': 'Asia/Singapore',
+    'hong kong': 'Asia/Hong_Kong',
+    'taiwan': 'Asia/Taipei',
+    'thailand': 'Asia/Bangkok',
+    'vietnam': 'Asia/Ho_Chi_Minh',
+    'malaysia': 'Asia/Kuala_Lumpur',
+    'philippines': 'Asia/Manila',
+    'indonesia': 'Asia/Jakarta',
+    'israel': 'Asia/Jerusalem',
+    'united arab emirates': 'Asia/Dubai',
+    'saudi arabia': 'Asia/Riyadh',
+    'turkey': 'Europe/Istanbul',
+    'united kingdom': 'Europe/London',
+    'uk': 'Europe/London',
+    'ireland': 'Europe/Dublin',
+    'germany': 'Europe/Berlin',
+    'france': 'Europe/Paris',
+    'spain': 'Europe/Madrid',
+    'italy': 'Europe/Rome',
+    'netherlands': 'Europe/Amsterdam',
+    'belgium': 'Europe/Brussels',
+    'switzerland': 'Europe/Zurich',
+    'austria': 'Europe/Vienna',
+    'sweden': 'Europe/Stockholm',
+    'norway': 'Europe/Oslo',
+    'denmark': 'Europe/Copenhagen',
+    'finland': 'Europe/Helsinki',
+    'poland': 'Europe/Warsaw',
+    'portugal': 'Europe/Lisbon',
+    'czech republic': 'Europe/Prague',
+    'romania': 'Europe/Bucharest',
+    'greece': 'Europe/Athens',
+    'south africa': 'Africa/Johannesburg',
+    'nigeria': 'Africa/Lagos',
+    'kenya': 'Africa/Nairobi',
+    'egypt': 'Africa/Cairo',
+    'new zealand': 'Pacific/Auckland',
+    'argentina': 'America/Argentina/Buenos_Aires',
+    'chile': 'America/Santiago',
+    'colombia': 'America/Bogota',
+    'peru': 'America/Lima',
+    'mexico': 'America/Mexico_City',
+  };
+
+  if (COUNTRY_TZ[c]) return COUNTRY_TZ[c];
+
+  // Multi-timezone countries — use city/state to narrow down
+  if (c === 'united states' || c === 'united states of america' || c === 'us' || c === 'usa') {
+    const eastern = ['new york', 'boston', 'miami', 'atlanta', 'charlotte', 'philadelphia', 'washington', 'detroit', 'pittsburgh', 'orlando', 'tampa', 'jacksonville', 'raleigh', 'richmond', 'baltimore', 'columbus', 'indianapolis', 'cleveland', 'cincinnati', 'nashville'];
+    const central = ['chicago', 'houston', 'dallas', 'austin', 'san antonio', 'memphis', 'milwaukee', 'kansas city', 'minneapolis', 'st. louis', 'new orleans', 'oklahoma city', 'omaha', 'des moines'];
+    const mountain = ['denver', 'phoenix', 'salt lake city', 'albuquerque', 'tucson', 'boise', 'colorado springs'];
+    const pacific = ['los angeles', 'san francisco', 'seattle', 'portland', 'san diego', 'san jose', 'sacramento', 'las vegas', 'oakland'];
+
+    if (eastern.some(x => ci.includes(x) || st.includes(x))) return 'America/New_York';
+    if (central.some(x => ci.includes(x) || st.includes(x))) return 'America/Chicago';
+    if (mountain.some(x => ci.includes(x) || st.includes(x))) return 'America/Denver';
+    if (pacific.some(x => ci.includes(x) || st.includes(x))) return 'America/Los_Angeles';
+
+    // State-level fallbacks for US
+    const stateMap = {
+      'california': 'America/Los_Angeles', 'ca': 'America/Los_Angeles',
+      'washington': 'America/Los_Angeles', 'wa': 'America/Los_Angeles',
+      'oregon': 'America/Los_Angeles', 'or': 'America/Los_Angeles',
+      'nevada': 'America/Los_Angeles', 'nv': 'America/Los_Angeles',
+      'texas': 'America/Chicago', 'tx': 'America/Chicago',
+      'illinois': 'America/Chicago', 'il': 'America/Chicago',
+      'florida': 'America/New_York', 'fl': 'America/New_York',
+      'new york': 'America/New_York', 'ny': 'America/New_York',
+      'massachusetts': 'America/New_York', 'ma': 'America/New_York',
+      'georgia': 'America/New_York', 'ga': 'America/New_York',
+      'pennsylvania': 'America/New_York', 'pa': 'America/New_York',
+      'ohio': 'America/New_York', 'oh': 'America/New_York',
+      'michigan': 'America/New_York', 'mi': 'America/New_York',
+      'virginia': 'America/New_York', 'va': 'America/New_York',
+      'north carolina': 'America/New_York', 'nc': 'America/New_York',
+      'colorado': 'America/Denver', 'co': 'America/Denver',
+      'arizona': 'America/Denver', 'az': 'America/Denver',
+      'minnesota': 'America/Chicago', 'mn': 'America/Chicago',
+      'wisconsin': 'America/Chicago', 'wi': 'America/Chicago',
+      'missouri': 'America/Chicago', 'mo': 'America/Chicago',
+      'tennessee': 'America/Chicago', 'tn': 'America/Chicago',
+    };
+    if (stateMap[st]) return stateMap[st];
+
+    return 'America/New_York'; // US default = Eastern
+  }
+
+  if (c === 'canada') {
+    if (['toronto', 'ottawa', 'montreal', 'quebec'].some(x => ci.includes(x))) return 'America/Toronto';
+    if (['vancouver', 'victoria'].some(x => ci.includes(x))) return 'America/Vancouver';
+    if (['calgary', 'edmonton'].some(x => ci.includes(x))) return 'America/Edmonton';
+    if (['winnipeg'].some(x => ci.includes(x))) return 'America/Winnipeg';
+    return 'America/Toronto';
+  }
+
+  if (c === 'australia') {
+    if (['sydney', 'melbourne', 'canberra', 'brisbane'].some(x => ci.includes(x))) return 'Australia/Sydney';
+    if (['perth'].some(x => ci.includes(x))) return 'Australia/Perth';
+    if (['adelaide'].some(x => ci.includes(x))) return 'Australia/Adelaide';
+    return 'Australia/Sydney';
+  }
+
+  if (c === 'brazil' || c === 'brasil') {
+    if (['sao paulo', 'rio de janeiro', 'brasilia'].some(x => ci.includes(x))) return 'America/Sao_Paulo';
+    return 'America/Sao_Paulo';
+  }
+
+  if (c === 'russia' || c === 'russian federation') {
+    if (['moscow', 'saint petersburg'].some(x => ci.includes(x))) return 'Europe/Moscow';
+    return 'Europe/Moscow';
+  }
+
+  return null;
 }
 
 /**
