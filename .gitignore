@@ -5,3 +5,4 @@ dist/
 .DS_Store
 wrangler.toml
 .env
+.superpowers/

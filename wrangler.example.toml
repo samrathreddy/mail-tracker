@@ -8,6 +8,19 @@ id = "your-kv-namespace-id-here"  # Replace with your actual KV namespace ID
 # Run: pnpm exec wrangler kv namespace create "TRACKER"
 # Then paste the id from the output here
 
+[[kv_namespaces]]
+binding = "SEQUENCES"
+id = "your-sequences-kv-namespace-id"  # Replace with your actual KV namespace ID
+# Run: pnpm exec wrangler kv namespace create "SEQUENCES"
+# Then paste the id from the output here
+
+[triggers]
+crons = ["*/5 * * * *"]  # Check for due follow-ups every 5 minutes
+
+# Required secrets for Gmail OAuth (set via wrangler secret put):
+# GOOGLE_CLIENT_ID -- from Google Cloud Console
+# GOOGLE_CLIENT_SECRET -- from Google Cloud Console
+
 # Optional: Set a password to protect your dashboard and API
 # Uncomment and set your password, or use wrangler secret for production
 # [vars]

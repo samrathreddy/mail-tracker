@@ -1,7 +1,45 @@
-import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, requireAuthCors, servePixel, html } from './shared.js';
+import { CORS_HEADERS, DEDUP_WINDOW_MS, json, isBot, checkAuth, requireAuth, requireAuthCors, servePixel, html, esc } from './shared.js';
 import { sendWebhookNotifications } from './notifications.js';
 import { renderDetail } from './views/detail.js';
 import { renderDashboard } from './views/dashboard.js';
+import { renderSequencesPage } from './views/sequences-page.js';
+import { renderTemplatesPage } from './views/templates-page.js';
+import { renderAnalyticsPage } from './views/analytics-page.js';
+import { renderActivityPage } from './views/activity-page.js';
+import { renderSettingsPage } from './views/settings-page.js';
+import { renderTemplateEditor } from './views/template-editor.js';
+import { validateTemplate, listTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from './templates.js';
+import { validateSequence, createSequence, listSequences, getSequence, stopSequence, skipStep, checkOpenStopCondition } from './sequences.js';
+import { getOAuthUrl, handleOAuthCallback, getOAuthStatus, disconnectOAuth } from './gmail-api.js';
+import { handleCron, recordOpenForAnalytics } from './cron.js';
+import { getRecipientInfo } from './hubspot.js';
+
+function parseUA(ua) {
+  let browser = 'Unknown', os = 'Unknown', device;
+
+  // Browser detection
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/OPR\//i.test(ua) || /Opera/i.test(ua)) browser = 'Opera';
+  else if (/Chrome\//i.test(ua) && !/Edg/i.test(ua)) browser = 'Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/MSIE|Trident/i.test(ua)) browser = 'IE';
+
+  // OS detection
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Mac OS X|macOS/i.test(ua)) os = 'macOS';
+  else if (/Linux/i.test(ua) && !/Android/i.test(ua)) os = 'Linux';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS';
+
+  // Device type
+  if (/Mobile|Android.*Mobile|iPhone|iPod/i.test(ua)) device = 'Mobile';
+  else if (/iPad|Android(?!.*Mobile)|Tablet/i.test(ua)) device = 'Tablet';
+  else device = 'Desktop';
+
+  return { browser, os, device };
+}
 
 export default {
   async fetch(request, env) {
@@ -24,11 +62,24 @@ export default {
       const userAgent = request.headers.get('user-agent') || 'unknown';
       const now = new Date().toISOString();
 
+      // Extract Cloudflare geo/network metadata
+      const cf = request.cf || {};
+      const city = cf.city || 'unknown';
+      const region = cf.region || 'unknown';
+      const cfTimezone = cf.timezone || 'unknown';
+      const asn = cf.asn || null;
+      const asOrganization = cf.asOrganization || 'unknown';
+      const latitude = cf.latitude || null;
+      const longitude = cf.longitude || null;
+
       // Filter 1: Sender IP exclusion
       if (existing.senderIp && existing.senderIp === ip) {
         existing.skipped = (existing.skipped || 0) + 1;
         existing.filteredEvents = existing.filteredEvents || [];
-        existing.filteredEvents.push({ time: now, ip, reason: 'sender_ip' });
+        existing.filteredEvents.push({
+          time: now, ip, reason: 'sender_ip',
+          city, region, timezone: cfTimezone, isp: asOrganization,
+        });
         if (existing.filteredEvents.length > 20) existing.filteredEvents = existing.filteredEvents.slice(-20);
         await env.TRACKER.put(id, JSON.stringify(existing));
         return servePixel();
@@ -38,7 +89,10 @@ export default {
       if (isBot(userAgent)) {
         existing.skipped = (existing.skipped || 0) + 1;
         existing.filteredEvents = existing.filteredEvents || [];
-        existing.filteredEvents.push({ time: now, ip, userAgent, reason: 'bot_proxy' });
+        existing.filteredEvents.push({
+          time: now, ip, userAgent, reason: 'bot_proxy',
+          city, region, timezone: cfTimezone, isp: asOrganization,
+        });
         if (existing.filteredEvents.length > 20) existing.filteredEvents = existing.filteredEvents.slice(-20);
         await env.TRACKER.put(id, JSON.stringify(existing));
         return servePixel();
@@ -51,23 +105,36 @@ export default {
         if (new Date(now).getTime() - lastTime < DEDUP_WINDOW_MS) return servePixel();
       }
 
-      // Genuine open
+      // Genuine open — parse user-agent into structured fields
+      const parsed = parseUA(userAgent || '');
       existing.opens += 1;
-      existing.events.push({ time: now, ip, country, userAgent });
+      existing.events.push({
+        time: now, ip, country, userAgent,
+        city, region, timezone: cfTimezone,
+        asn, isp: asOrganization,
+        lat: latitude, lon: longitude,
+        browser: parsed.browser, os: parsed.os, device: parsed.device,
+      });
       if (existing.events.length > 100) existing.events = existing.events.slice(-100);
       await env.TRACKER.put(id, JSON.stringify(existing));
 
       // Send webhook notifications
       const timeStr = new Date(now).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-      const timezone = new Date(now).toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+      const notifTimezone = new Date(now).toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop();
 
       await sendWebhookNotifications(env, {
         recipient: existing.recipient,
         subject: existing.subject,
         opens: existing.opens,
         country, ip,
-        time: `${timeStr} (${timezone})`
+        time: `${timeStr} (${notifTimezone})`
       });
+
+      // Check if this open should stop an active sequence
+      if (env.SEQUENCES) {
+        await checkOpenStopCondition(env, id);
+        await recordOpenForAnalytics(env, id);
+      }
 
       return servePixel();
     }
@@ -90,7 +157,17 @@ export default {
         return json({ ...safeData, recipient: data.recipient || null, hasSenderProtection: !!senderIp });
       }
 
-      return html(renderDetail(id, data));
+      let sequenceInfo = null;
+      if (env.SEQUENCES) {
+        const seqId = await env.SEQUENCES.get(`tracker-seq:${id}`);
+        if (seqId) {
+          sequenceInfo = await env.SEQUENCES.get(seqId, 'json');
+        }
+      }
+
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+
+      return html(renderDetail(id, data, sequenceInfo, oauthConnected));
     }
 
     // GET/POST /new — create a new tracking pixel
@@ -100,7 +177,7 @@ export default {
       const id = crypto.randomUUID().slice(0, 8);
       const senderIp = request.headers.get('cf-connecting-ip') || 'unknown';
 
-      let recipient = null, subject = '', bodyPreview = '', messageId = '';
+      let recipient, subject, bodyPreview, messageId;
 
       if (request.method === 'POST') {
         try {
@@ -109,11 +186,14 @@ export default {
           subject = body.subject || '';
           bodyPreview = body.bodyPreview || '';
           messageId = body.messageId || '';
-        } catch (e) {
+        } catch (_e) {
           return json({ error: 'Invalid JSON body' }, 400);
         }
       } else {
         recipient = url.searchParams.get('to') || null;
+        subject = '';
+        bodyPreview = '';
+        messageId = '';
       }
 
       if (recipient && !recipient.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return json({ error: 'Invalid email format' }, 400);
@@ -157,6 +237,12 @@ export default {
       const id = url.pathname.split('/d/')[1];
       if (!id) return json({ error: 'Missing id' }, 400);
       await env.TRACKER.delete(id);
+      if (env.SEQUENCES) {
+        const seqId = await env.SEQUENCES.get(`tracker-seq:${id}`);
+        if (seqId) {
+          await env.SEQUENCES.delete(`tracker-seq:${id}`);
+        }
+      }
       return json({ deleted: id });
     }
 
@@ -166,15 +252,45 @@ export default {
 
       const list = await env.TRACKER.list();
       const results = [];
+      const now = Date.now();
+      const sparkline = [0, 0, 0, 0, 0, 0, 0];
+
       for (const key of list.keys) {
         const data = await env.TRACKER.get(key.name, 'json');
-        results.push({
+        const result = {
           id: key.name, email: data?.recipient || key.name,
           subject: data?.subject || '', bodyPreview: data?.bodyPreview || '',
           opens: data?.opens || 0,
           lastOpen: data?.events?.length ? data.events[data.events.length - 1].time : 'never',
           createdAt: data?.createdAt || null,
-        });
+          sequenceProgress: null,
+        };
+
+        // Aggregate event timestamps into sparkline (last 7 days)
+        if (data?.events) {
+          for (const evt of data.events) {
+            const eventTime = new Date(evt.time).getTime();
+            const dayIndex = 6 - Math.floor((now - eventTime) / 86400000);
+            if (dayIndex >= 0 && dayIndex <= 6) {
+              sparkline[dayIndex]++;
+            }
+          }
+        }
+
+        if (env.SEQUENCES) {
+          const seqId = await env.SEQUENCES.get(`tracker-seq:${key.name}`);
+          if (seqId) {
+            const seq = await env.SEQUENCES.get(seqId, 'json');
+            if (seq) {
+              result.sequenceProgress = seq.status === 'completed'
+                ? 'Sequence complete'
+                : seq.status === 'active'
+                  ? `Step ${seq.currentStep + 1}/${seq.steps.length}`
+                  : seq.status === 'stopped' ? 'Stopped' : null;
+            }
+          }
+        }
+        results.push(result);
       }
 
       results.sort((a, b) => {
@@ -186,9 +302,461 @@ export default {
       const totalOpens = results.reduce((s, r) => s + r.opens, 0);
       const activeCount = results.filter(r => r.opens > 0).length;
 
-      return html(renderDashboard(results, totalOpens, activeCount));
+      // Sequence stats
+      let sequences = { active: 0, completed: 0, stopped: 0, total: 0 };
+      let oauthConnected = false;
+      if (env.SEQUENCES) {
+        const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+        for (const k of seqKeys.keys) {
+          const seq = await env.SEQUENCES.get(k.name, 'json');
+          if (seq) {
+            sequences.total++;
+            if (seq.status === 'active') sequences.active++;
+            else if (seq.status === 'completed') sequences.completed++;
+            else if (seq.status === 'stopped') sequences.stopped++;
+          }
+        }
+        const tokens = await env.SEQUENCES.get('oauth:tokens');
+        oauthConnected = !!tokens;
+      }
+
+      return html(renderDashboard({
+        results, totalOpens, activeCount, sparkline,
+        totalTrackers: results.length, sequences, oauthConnected,
+      }));
+    }
+
+    // GET /settings — settings page
+    if (url.pathname === '/settings' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const trackerKeys = await env.TRACKER.list();
+      let templateCount = 0, sequenceCount = 0, oauthEmail = null, oauthError = null;
+      let oauthConnected = false;
+      if (env.SEQUENCES) {
+        const tmplKeys = await env.SEQUENCES.list({ prefix: 'tmpl:' });
+        templateCount = tmplKeys.keys.length;
+        const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+        sequenceCount = seqKeys.keys.length;
+        const tokens = await env.SEQUENCES.get('oauth:tokens', 'json');
+        oauthConnected = !!tokens;
+        oauthEmail = tokens?.email || null;
+        const err = await env.SEQUENCES.get('oauth:error', 'json');
+        oauthError = err;
+      }
+      return html(renderSettingsPage({
+        oauthConnected, oauthEmail, oauthError,
+        sequenceCount, templateCount, trackerCount: trackerKeys.keys.length,
+      }));
+    }
+
+    // === HTML VIEW ROUTES (must come before JSON API routes) ===
+
+    if (url.pathname === '/sequences' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
+      if (!checkAuth(request, env)) return requireAuth();
+      const sequences = await listSequences(env);
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderSequencesPage(sequences, oauthConnected));
+    }
+
+    if (url.pathname === '/templates/new' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderTemplateEditor(null, oauthConnected));
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+\/edit$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const id = url.pathname.match(/^\/templates\/(tmpl:[a-f0-9]+)\/edit$/)[1];
+      const tmpl = await getTemplate(env, id);
+      if (!tmpl) return new Response('Template not found', { status: 404 });
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderTemplateEditor(tmpl, oauthConnected));
+    }
+
+    if (url.pathname === '/templates' && request.method === 'GET' && request.headers.get('accept')?.includes('text/html')) {
+      if (!checkAuth(request, env)) return requireAuth();
+      const templates = await listTemplates(env);
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      return html(renderTemplatesPage(templates, oauthConnected));
+    }
+
+    if (url.pathname === '/analytics' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+      const analyticsKeys = await env.SEQUENCES.list({ prefix: 'analytics:' });
+      const analyticsData = await Promise.all(analyticsKeys.keys.map(k => env.SEQUENCES.get(k.name, 'json')));
+      const templates = await listTemplates(env);
+      const oauthConnected = env.SEQUENCES ? !!(await env.SEQUENCES.get('oauth:tokens')) : false;
+      const dailyKeys = await env.SEQUENCES.list({ prefix: 'analytics-daily:' });
+      const dailyDataMap = {};
+      for (const k of dailyKeys.keys) {
+        const d = await env.SEQUENCES.get(k.name, 'json');
+        if (d) dailyDataMap[d.templateId] = d.days;
+      }
+      return html(renderAnalyticsPage(analyticsData.filter(Boolean), templates, oauthConnected, dailyDataMap));
+    }
+
+    // GET /activity — activity feed page
+    if (url.pathname === '/activity' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuth();
+
+      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const allEvents = [];
+
+      // Collect events from trackers
+      const trackerList = await env.TRACKER.list();
+      for (const key of trackerList.keys) {
+        const data = await env.TRACKER.get(key.name, 'json');
+        if (!data) continue;
+
+        const recipient = data.recipient || key.name;
+        const subject = data.subject || 'Untitled';
+
+        // Open events
+        if (data.events) {
+          for (const evt of data.events) {
+            const locationParts = [];
+            if (evt.city && evt.city !== 'unknown') locationParts.push(esc(evt.city));
+            if (evt.region && evt.region !== 'unknown') locationParts.push(esc(evt.region));
+            if (evt.country && evt.country !== 'unknown') locationParts.push(esc(evt.country));
+            const locationStr = locationParts.join(', ');
+
+            const deviceParts = [];
+            if (evt.browser && evt.browser !== 'Unknown') deviceParts.push(evt.browser);
+            if (evt.os && evt.os !== 'Unknown') deviceParts.push(evt.os);
+            const deviceStr = deviceParts.length > 0 ? esc(deviceParts.join(' on ')) : '';
+
+            const detailParts = [locationStr, deviceStr].filter(Boolean);
+
+            allEvents.push({
+              type: 'open',
+              time: evt.time,
+              description: `<strong>${esc(recipient)}</strong> opened <em>${esc(subject)}</em>`,
+              detail: detailParts.length > 0 ? detailParts.join(' \u00b7 ') : null,
+            });
+          }
+        }
+
+        // Filtered events
+        if (data.filteredEvents) {
+          for (const evt of data.filteredEvents) {
+            allEvents.push({
+              type: 'filtered',
+              time: evt.time,
+              description: `Open from <strong>${esc(recipient)}</strong> filtered — <em>${esc(evt.reason || 'unknown')}</em>`,
+            });
+          }
+        }
+
+        // Tracker created
+        if (data.createdAt) {
+          allEvents.push({
+            type: 'tracker_created',
+            time: data.createdAt,
+            description: `Tracker created for <strong>${esc(recipient)}</strong> — <em>${esc(subject)}</em>`,
+          });
+        }
+      }
+
+      // Collect events from sequences
+      if (env.SEQUENCES) {
+        const seqKeys = await env.SEQUENCES.list({ prefix: 'seq:' });
+        for (const k of seqKeys.keys) {
+          const seq = await env.SEQUENCES.get(k.name, 'json');
+          if (!seq) continue;
+
+          const seqRecipient = seq.recipient || k.name;
+
+          // Steps with sentAt
+          if (seq.steps) {
+            for (const step of seq.steps) {
+              if (step.sentAt) {
+                allEvents.push({
+                  type: 'follow_up_sent',
+                  time: step.sentAt,
+                  description: `Follow-up sent to <strong>${esc(seqRecipient)}</strong> — <em>${esc(step.subject || 'Step')}</em>`,
+                });
+              }
+            }
+          }
+
+          // Stopped sequences
+          if (seq.status === 'stopped' && seq.stoppedAt) {
+            allEvents.push({
+              type: 'sequence_stopped',
+              time: seq.stoppedAt,
+              description: `Sequence stopped for <strong>${esc(seqRecipient)}</strong> — <em>${esc(seq.stopReason || 'manual')}</em>`,
+            });
+          }
+
+          // Completed sequences
+          if (seq.status === 'completed' && seq.completedAt) {
+            allEvents.push({
+              type: 'sequence_completed',
+              time: seq.completedAt,
+              description: `Sequence completed for <strong>${esc(seqRecipient)}</strong>`,
+            });
+          }
+        }
+      }
+
+      // Sort by time descending and paginate
+      allEvents.sort((a, b) => new Date(b.time) - new Date(a.time));
+      const totalCount = allEvents.length;
+      const pageEvents = allEvents.slice(offset, offset + 50);
+
+      // Compute relative timeAgo
+      const now = Date.now();
+      const eventsWithTimeAgo = pageEvents.map(evt => {
+        const diff = now - new Date(evt.time).getTime();
+        const mins = Math.floor(diff / 60000);
+        let timeAgo;
+        if (mins < 1) timeAgo = 'just now';
+        else if (mins < 60) timeAgo = mins + 'm ago';
+        else {
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) timeAgo = hrs + 'h ago';
+          else {
+            const days = Math.floor(hrs / 24);
+            if (days < 30) timeAgo = days + 'd ago';
+            else timeAgo = new Date(evt.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }
+        }
+        return { type: evt.type, description: evt.description, detail: evt.detail || null, timeAgo };
+      });
+
+      // Check OAuth status
+      let oauthConnected = false;
+      if (env.SEQUENCES) {
+        const tokens = await env.SEQUENCES.get('oauth:tokens');
+        oauthConnected = !!tokens;
+      }
+
+      return html(renderActivityPage(eventsWithTimeAgo, totalCount, offset, oauthConnected));
+    }
+
+    // === TEMPLATE ROUTES ===
+
+    if (url.pathname === '/templates' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const templates = await listTemplates(env);
+      return json(templates);
+    }
+
+    if (url.pathname === '/templates' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+      const error = validateTemplate(body);
+      if (error) return json({ error }, 400);
+      const template = await createTemplate(env, body);
+      return json(template, 201);
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/templates/')[1];
+      const template = await getTemplate(env, id);
+      if (!template) return json({ error: 'Template not found' }, 404);
+      return json(template);
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'PUT') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/templates/')[1];
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+      if (body.name !== undefined) {
+        if (typeof body.name !== 'string' || body.name.trim().length === 0) return json({ error: 'Name is required' }, 400);
+        if (body.name.length > 100) return json({ error: 'Name must be 100 chars or less' }, 400);
+      }
+      if (body.timezone !== undefined) {
+        try { Intl.DateTimeFormat(undefined, { timeZone: body.timezone }); }
+        catch { return json({ error: 'Invalid timezone' }, 400); }
+      }
+      if (body.steps) {
+        const error = validateTemplate({ name: body.name || 'temp', steps: body.steps, timezone: body.timezone });
+        if (error) return json({ error }, 400);
+      }
+      const updated = await updateTemplate(env, id, body);
+      if (!updated) return json({ error: 'Template not found' }, 404);
+      return json(updated);
+    }
+
+    if (url.pathname.match(/^\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'DELETE') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/templates/')[1];
+      const deleted = await deleteTemplate(env, id);
+      if (!deleted) return json({ error: 'Template not found' }, 404);
+      return json({ deleted: id });
+    }
+
+    // === SEQUENCE ROUTES ===
+
+    if (url.pathname === '/sequences' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const status = url.searchParams.get('status');
+      const sequences = await listSequences(env, status);
+      return json(sequences);
+    }
+
+    if (url.pathname === '/sequences' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+      const error = validateSequence(body);
+      if (error) return json({ error }, 400);
+      const result = await createSequence(env, body);
+      if (result.error) return json({ error: result.error }, 400);
+      return json(result.sequence, 201);
+    }
+
+    if (url.pathname.match(/^\/sequences\/seq:[a-f0-9]+$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/sequences/')[1];
+      const seq = await getSequence(env, id);
+      if (!seq) return json({ error: 'Sequence not found' }, 404);
+      return json(seq);
+    }
+
+    if (url.pathname.match(/^\/sequences\/seq:[a-f0-9]+$/) && request.method === 'DELETE') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.split('/sequences/')[1];
+      const stopped = await stopSequence(env, id, 'manual');
+      if (!stopped) return json({ error: 'Sequence not found' }, 404);
+      return json(stopped);
+    }
+
+    if (url.pathname.match(/^\/sequences\/seq:[a-f0-9]+\/skip$/) && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const id = url.pathname.match(/^\/sequences\/(seq:[a-f0-9]+)\/skip$/)[1];
+      const result = await skipStep(env, id);
+      if (!result) return json({ error: 'Sequence not found or not active' }, 404);
+      return json(result);
+    }
+
+    // === OAUTH ROUTES ===
+
+    if (url.pathname === '/oauth/url' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const redirectUri = `${url.origin}/oauth/callback`;
+      const authUrl = await getOAuthUrl(env, redirectUri);
+      return json({ url: authUrl });
+    }
+
+    if (url.pathname === '/oauth/callback' && request.method === 'GET') {
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
+      if (!code || !state) return new Response('Missing code or state', { status: 400 });
+      const redirectUri = `${url.origin}/oauth/callback`;
+      const result = await handleOAuthCallback(env, code, state, redirectUri);
+      if (result.success) {
+        return Response.redirect(`${url.origin}/?oauth=success`, 302);
+      }
+      return new Response(`OAuth error: ${result.error}`, { status: 400 });
+    }
+
+    if (url.pathname === '/oauth/status' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const status = await getOAuthStatus(env);
+      return json(status);
+    }
+
+    if (url.pathname === '/oauth/disconnect' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      await disconnectOAuth(env);
+      return json({ disconnected: true });
+    }
+
+    // === RECIPIENT INFO & SCHEDULED EMAIL (extension API) ===
+
+    if (url.pathname === '/recipient/info' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const email = url.searchParams.get('email');
+      if (!email) return json({ error: 'email parameter required' }, 400);
+      const defaultTz = url.searchParams.get('defaultTimezone') || 'America/New_York';
+      const info = await getRecipientInfo(env, email, defaultTz);
+      return json(info);
+    }
+
+    if (url.pathname === '/scheduled' && request.method === 'POST') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
+      let body;
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      if (!body.to || !body.subject || !body.body || !body.scheduledAt) {
+        return json({ error: 'to, subject, body, and scheduledAt are required' }, 400);
+      }
+      if (!body.to.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return json({ error: 'Invalid email format' }, 400);
+      if (body.body.length > 500000) return json({ error: 'Email body too large (max 500KB)' }, 400);
+      const scheduledDate = new Date(body.scheduledAt);
+      if (isNaN(scheduledDate.getTime())) {
+        return json({ error: 'scheduledAt must be a valid ISO-8601 date' }, 400);
+      }
+      if (scheduledDate.getTime() < Date.now()) {
+        return json({ error: 'scheduledAt must be in the future' }, 400);
+      }
+      const id = `sched:${crypto.randomUUID().slice(0, 8)}`;
+      const scheduled = {
+        id, to: body.to, cc: body.cc || '', bcc: body.bcc || '',
+        subject: body.subject, body: body.body,
+        scheduledAt: body.scheduledAt,
+        recipientTimezone: body.recipientTimezone || null,
+        timezoneSource: body.timezoneSource || null,
+        trackerId: body.trackerId || null,
+        sequenceId: body.sequenceId || null,
+        threadId: body.threadId || null,
+        inReplyTo: body.inReplyTo || null,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      await env.SEQUENCES.put(id, JSON.stringify(scheduled));
+      return json(scheduled, 201);
+    }
+
+    if (url.pathname === '/scheduled' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
+      const keys = await env.SEQUENCES.list({ prefix: 'sched:' });
+      const statusFilter = url.searchParams.get('status');
+      let items = (await Promise.all(keys.keys.map(k => env.SEQUENCES.get(k.name, 'json')))).filter(Boolean);
+      if (statusFilter) items = items.filter(i => i.status === statusFilter);
+      return json(items);
+    }
+
+    if (url.pathname.match(/^\/scheduled\/sched:[a-f0-9]+$/) && request.method === 'DELETE') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      if (!env.SEQUENCES) return json({ error: 'Sequences storage not configured' }, 503);
+      const id = url.pathname.split('/scheduled/')[1];
+      const existing = await env.SEQUENCES.get(id, 'json');
+      if (!existing) return json({ error: 'Not found' }, 404);
+      if (existing.status === 'sent') return json({ error: 'Already sent' }, 400);
+      await env.SEQUENCES.delete(id);
+      return json({ deleted: id });
+    }
+
+    // === ANALYTICS ROUTES ===
+
+    if (url.pathname === '/analytics/templates' && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const keys = await env.SEQUENCES.list({ prefix: 'analytics:' });
+      const analytics = await Promise.all(
+        keys.keys.map(k => env.SEQUENCES.get(k.name, 'json'))
+      );
+      return json(analytics.filter(Boolean));
+    }
+
+    if (url.pathname.match(/^\/analytics\/templates\/tmpl:[a-f0-9]+$/) && request.method === 'GET') {
+      if (!checkAuth(request, env)) return requireAuthCors();
+      const templateId = url.pathname.split('/analytics/templates/')[1];
+      const analytics = await env.SEQUENCES.get(`analytics:${templateId}`, 'json');
+      if (!analytics) return json({ error: 'No analytics found' }, 404);
+      return json(analytics);
     }
 
     return new Response('Not found', { status: 404 });
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleCron(env));
   },
 };

@@ -1,6 +1,17 @@
-import { esc, FAVICON } from '../shared.js';
+import { esc } from '../shared.js';
+import { renderLayout } from './layout.js';
+import { renderStatCard, renderStepProgress, renderBadge, safeJson } from './components.js';
 
-export function renderDetail(id, data) {
+/**
+ * Renders the tracker detail page.
+ *
+ * @param {string} id - Tracker ID
+ * @param {Object} data - Tracker data from KV
+ * @param {Object|null} sequenceInfo - Sequence info if attached
+ * @param {boolean} oauthConnected - Whether Gmail OAuth is connected
+ * @returns {string} Complete HTML page
+ */
+export function renderDetail(id, data, sequenceInfo, oauthConnected) {
   const events = data.events || [];
   const filteredEvents = data.filteredEvents || [];
   const recipient = data.recipient || id;
@@ -8,196 +19,313 @@ export function renderDetail(id, data) {
   const lastOpenTime = events.length > 0 ? events[events.length - 1].time : null;
   const uniqueIps = new Set(events.map(e => e.ip)).size;
 
-  return `<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(recipient)} - Mail Tracker</title>
-<link rel="icon" href="${FAVICON}">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #09090b; --surface: #18181b; --surface-2: #1f1f23;
-    --border: #27272a; --border-hover: #3f3f46;
-    --text: #fafafa; --text-2: #a1a1aa; --text-3: #71717a;
-    --accent: #6366f1; --accent-glow: rgba(99,102,241,0.15);
-    --green: #34d399; --green-dim: rgba(52,211,153,0.12);
-    --amber: #fbbf24; --amber-dim: rgba(251,191,36,0.12);
-    --red: #f87171; --red-dim: rgba(248,113,113,0.12);
-    --blue: #60a5fa; --blue-dim: rgba(96,165,250,0.12);
-    --radius: 12px; --radius-sm: 8px;
-  }
-  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-  .top-bar { position: sticky; top: 0; z-index: 50; background: rgba(9,9,11,0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; gap: 16px; }
-  .top-bar a { color: var(--text-2); text-decoration: none; font-size: 0.875rem; transition: color 0.15s; }
-  .top-bar a:hover { color: var(--text); }
-  .top-bar .sep { color: var(--text-3); }
-  .top-bar .current { color: var(--text); font-weight: 600; font-size: 0.875rem; }
-  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
-  .header { margin-bottom: 32px; }
-  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
-  .header .meta { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
-  .header .meta span { font-size: 0.8rem; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
-  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; }
-  .badge-green { background: var(--green-dim); color: var(--green); }
-  .badge-amber { background: var(--amber-dim); color: var(--amber); }
-  .copy-id { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-3); cursor: pointer; font-family: 'SF Mono', 'Fira Code', monospace; transition: all 0.15s; }
-  .copy-id:hover { border-color: var(--accent); color: var(--accent); }
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
-  @media (max-width: 640px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; transition: border-color 0.2s; }
-  .stat-card:hover { border-color: var(--border-hover); }
-  .stat-label { font-size: 0.75rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-  .stat-value { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
-  .stat-value.green { color: var(--green); } .stat-value.amber { color: var(--amber); } .stat-value.blue { color: var(--blue); }
-  .stat-sub { font-size: 0.75rem; color: var(--text-3); margin-top: 4px; }
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
-  .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .panel-title { font-size: 0.875rem; font-weight: 600; }
-  .panel-body { padding: 20px; }
-  .panel-hint { font-size: 0.7rem; color: var(--text-3); }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
-  .two-col .panel { margin-bottom: 0; }
-  .time-grid { display: flex; flex-direction: column; gap: 10px; }
-  .time-row-label { font-size: 0.7rem; color: var(--text-3); font-weight: 600; margin-bottom: 4px; letter-spacing: 0.04em; }
-  .time-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
-  .time-cell { aspect-ratio: 1; border-radius: 4px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: default; transition: transform 0.15s, box-shadow 0.15s; position: relative; }
-  .time-cell:hover { transform: scale(1.15); z-index: 2; box-shadow: 0 0 12px rgba(0,0,0,0.5); }
-  .time-cell .tc-hour { font-size: 0.55rem; color: var(--text-3); font-weight: 500; line-height: 1; }
-  .time-cell .tc-count { font-size: 0.7rem; font-weight: 700; color: var(--text); line-height: 1; margin-top: 2px; }
-  .time-cell.t0 { background: var(--surface-2); } .time-cell.t0 .tc-count { color: var(--text-3); }
-  .time-cell.t1 { background: rgba(99,102,241,0.2); } .time-cell.t2 { background: rgba(99,102,241,0.4); }
-  .time-cell.t3 { background: rgba(99,102,241,0.6); } .time-cell.t4 { background: rgba(99,102,241,0.85); }
-  .time-cell.peak { background: var(--green); } .time-cell.peak .tc-hour { color: rgba(0,0,0,0.5); } .time-cell.peak .tc-count { color: #fff; }
-  .time-peak-info { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-  .time-peak-info .tpi-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--green); flex-shrink: 0; }
-  .time-peak-info .tpi-text { font-size: 0.75rem; color: var(--text-2); }
-  .cal-wrap { overflow-x: auto; }
-  .cal-grid { display: flex; gap: 3px; } .cal-week { display: flex; flex-direction: column; gap: 3px; }
-  .cal-cell { width: 13px; height: 13px; border-radius: 2px; background: var(--surface-2); transition: background 0.15s; cursor: default; position: relative; }
-  .cal-cell.l1 { background: rgba(99,102,241,0.25); } .cal-cell.l2 { background: rgba(99,102,241,0.45); }
-  .cal-cell.l3 { background: rgba(99,102,241,0.7); } .cal-cell.l4 { background: var(--accent); }
-  .cal-cell:hover { outline: 1px solid var(--text-3); outline-offset: -1px; }
-  .cal-months { display: flex; gap: 0; margin-bottom: 4px; } .cal-months span { font-size: 0.6rem; color: var(--text-3); }
-  .cal-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; justify-content: flex-end; }
-  .cal-legend span { font-size: 0.6rem; color: var(--text-3); }
-  .cal-legend-cell { width: 11px; height: 11px; border-radius: 2px; }
-  .cal-tooltip { position: fixed; padding: 4px 8px; border-radius: 4px; background: var(--text); color: var(--bg); font-size: 0.7rem; pointer-events: none; z-index: 100; white-space: nowrap; opacity: 0; transition: opacity 0.1s; }
-  .timeline { position: relative; }
-  .timeline::before { content: ''; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--border); border-radius: 1px; }
-  .tl-item { display: flex; gap: 16px; padding: 12px 0; position: relative; animation: fadeSlide 0.3s ease both; }
-  .tl-item:first-child { padding-top: 0; }
-  @keyframes fadeSlide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  .tl-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; background: var(--surface-2); border: 2px solid var(--accent); position: relative; z-index: 1; margin-top: 2px; }
-  .tl-dot.filtered { border-color: var(--amber); }
-  .tl-content { flex: 1; min-width: 0; } .tl-time { font-size: 0.8rem; color: var(--text-2); font-weight: 500; }
-  .tl-time-full { color: var(--text-3); font-weight: 400; }
-  .tl-details { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
-  .tl-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--text-3); background: var(--surface-2); padding: 2px 8px; border-radius: 4px; }
-  .tl-reason { font-size: 0.75rem; color: var(--amber); font-weight: 500; }
-  .tabs { display: flex; gap: 4px; }
-  .tab { padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; background: transparent; border: none; color: var(--text-3); cursor: pointer; transition: all 0.15s; font-weight: 500; }
-  .tab:hover { color: var(--text-2); background: var(--surface-2); } .tab.active { color: var(--text); background: var(--surface-2); }
-  .empty-state { text-align: center; padding: 48px 20px; color: var(--text-3); } .empty-state p { font-size: 0.875rem; }
-  .protection-banner { display: flex; align-items: center; gap: 8px; background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2); border-radius: var(--radius-sm); padding: 10px 16px; margin-bottom: 20px; font-size: 0.8rem; color: var(--green); }
-  .delete-btn { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-3); cursor: pointer; transition: all 0.15s; }
-  .delete-btn:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
-</style></head>
-<body>
-  <div class="top-bar">
-    <a href="/">Mail Tracker</a>
-    <span class="sep">/</span>
-    <span class="current" id="navRecipient"></span>
-  </div>
+  // -- Header actions: back link + delete button --
+  const headerActions = `
+    <a href="/" class="btn btn-secondary" style="text-decoration:none;font-size:12px;color:var(--text-muted);transition:color 0.15s ease;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      Dashboard
+    </a>
+    <button class="btn btn-danger" id="deleteBtn">Delete</button>`;
 
-  <div class="container">
-    <div class="header">
-      <div class="header-row">
-        <div>
-          <h1 id="pageTitle"></h1>
-          <div class="meta">
-            <span id="metaRecipient" style="display:none"></span>
-            <span id="metaCreated"></span>
-            <button class="copy-id" id="copyBtn"></button>
+  // -- Stat cards --
+  const statCards = `<div class="stat-grid">
+    ${renderStatCard({
+      label: 'Real Opens',
+      value: String(data.opens || 0),
+      extra: uniqueIps + ' unique ' + (uniqueIps === 1 ? 'viewer' : 'viewers'),
+    })}
+    ${renderStatCard({
+      label: 'Filtered',
+      value: String(data.skipped || 0),
+      extra: 'bots &amp; self-opens',
+    })}
+    ${renderStatCard({
+      label: 'First Open',
+      value: firstOpen ? '<span id="statFirst"></span>' : '\u2014',
+      extra: firstOpen ? '<span id="statFirstSub"></span>' : 'not yet',
+    })}
+    ${renderStatCard({
+      label: 'Last Open',
+      value: lastOpenTime ? '<span id="statLast"></span>' : '\u2014',
+      extra: lastOpenTime ? '<span id="statLastSub"></span>' : 'not yet',
+    })}
+  </div>`;
+
+  // -- Sequence section --
+  let sequenceHtml = '';
+  if (sequenceInfo) {
+    const statusVariant = sequenceInfo.status === 'active' ? 'green'
+      : sequenceInfo.status === 'completed' ? 'blue'
+        : sequenceInfo.status === 'stopped' ? 'gray' : 'yellow';
+
+    const stepDetails = sequenceInfo.steps.map((s, i) => {
+      const sentInfo = s.sentAt
+        ? ' (sent ' + esc(new Date(s.sentAt).toLocaleString('en-US', { timeZone: sequenceInfo.timezone })) + ')'
+        : '';
+      return `<div style="padding:4px 0;font-size:12px;color:var(--text-secondary);">
+        Step ${i + 1}: Day ${s.delayDays} - ${esc(s.subject.substring(0, 60))}${sentInfo}
+      </div>`;
+    }).join('');
+
+    const actionButtons = sequenceInfo.status === 'active' ? `
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button class="btn btn-danger" id="cancelSeqBtn">Cancel Sequence</button>
+        <button class="btn btn-primary" id="skipStepBtn">Skip Step</button>
+      </div>` : '';
+
+    sequenceHtml = `
+      <div class="panel sequence-callout" style="margin-bottom:16px;">
+        <div class="panel-title" style="display:flex;align-items:center;gap:8px;">
+          Sequence ${renderBadge(esc(sequenceInfo.status), statusVariant)}
+        </div>
+        ${renderStepProgress(sequenceInfo.steps)}
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;">
+          <div style="font-size:11px;color:var(--text-muted);">
+            Template: <span style="color:var(--text-secondary);">${esc(sequenceInfo.templateName || 'Unknown')}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">
+            Timezone: <span style="color:var(--text-secondary);">${esc(sequenceInfo.timezone || 'UTC')}</span>
+          </div>
+          ${sequenceInfo.nextSendAt ? `<div style="font-size:11px;color:var(--text-muted);">
+            Next send: <span style="color:var(--text-secondary);">${esc(new Date(sequenceInfo.nextSendAt).toLocaleString('en-US', { timeZone: sequenceInfo.timezone }))}</span>
+          </div>` : ''}
+        </div>
+        ${stepDetails}
+        ${actionButtons}
+      </div>`;
+  }
+
+  // -- Pixel snippet section (content populated client-side) --
+  const pixelSnippet = `
+    <div class="panel">
+      <div class="panel-title">Pixel Snippet</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">HTML (click to copy)</div>
+      <div class="input snippet-box" id="snippetHtml" style="font-family:monospace;font-size:11px;word-break:break-all;user-select:all;cursor:pointer;padding:10px;margin-bottom:10px;"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">URL (click to copy)</div>
+      <div class="input snippet-box" id="snippetUrl" style="font-family:monospace;font-size:11px;word-break:break-all;user-select:all;cursor:pointer;padding:10px;"></div>
+    </div>`;
+
+  // -- Two-column layout --
+  const bodyHtml = `
+    <div style="padding:0 32px 32px;">
+      ${statCards}
+
+      ${sequenceHtml}
+
+      <div class="two-col" style="margin-top:16px;">
+        <div class="col-left" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span class="panel-title" style="margin-bottom:0;">Event Timeline</span>
+              <div class="filter-tabs">
+                <button class="filter-tab active" id="tabOpens">Opens</button>
+                <button class="filter-tab" id="tabFiltered">Filtered</button>
+              </div>
+            </div>
+            <div id="opensTab" class="detail-event-list"></div>
+            <div id="filteredTab" class="detail-event-list" style="display:none"></div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span id="statusBadge" class="badge"></span>
-          <button class="delete-btn" id="deleteBtn">Delete</button>
+        <div class="col-right" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span class="panel-title" style="margin-bottom:0;">Open Activity</span>
+              <span style="font-size:10px;color:var(--text-muted);" id="calRange"></span>
+            </div>
+            <div id="calWrap" style="overflow-x:auto;"></div>
+            <div id="calLegend" style="display:flex;align-items:center;gap:4px;margin-top:10px;justify-content:flex-end;"></div>
+          </div>
+          <div class="panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span class="panel-title" style="margin-bottom:0;">Peak Hours</span>
+              <span style="font-size:10px;color:var(--text-muted);">local time</span>
+            </div>
+            <div id="timeGrid"></div>
+          </div>
+          ${pixelSnippet}
         </div>
       </div>
-    </div>
+    </div>`;
 
-    <div id="protectionBanner" class="protection-banner" style="display:none">
-      Sender protection active — your own opens are automatically filtered
-    </div>
+  // -- Additional detail-page styles --
+  const detailStyles = `
+    <style>
+      .cal-grid { display: flex; gap: 3px; }
+      .cal-week { display: flex; flex-direction: column; gap: 3px; }
+      .cal-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--bg-hover); cursor: default; position: relative; transition: transform 0.1s ease, box-shadow 0.1s ease; }
+      .cal-cell.l1 { background: rgba(59,130,246,0.2); }
+      .cal-cell.l2 { background: rgba(59,130,246,0.4); }
+      .cal-cell.l3 { background: rgba(59,130,246,0.6); }
+      .cal-cell.l4 { background: var(--accent); }
+      .cal-cell:hover { transform: scale(1.3); z-index: 2; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
+      .cal-months { display: flex; gap: 0; margin-bottom: 4px; }
+      .cal-months span { font-size: 9px; color: var(--text-muted); }
+      .cal-legend-cell { width: 11px; height: 11px; border-radius: 3px; }
+      .cal-tooltip { position: fixed; padding: 4px 8px; border-radius: 4px; background: var(--text-primary); color: var(--bg-base); font-size: 11px; pointer-events: none; z-index: 100; white-space: nowrap; opacity: 0; transition: opacity 0.1s; }
 
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">Opens</div><div class="stat-value green" id="statOpens"></div><div class="stat-sub" id="statViewers"></div></div>
-      <div class="stat-card"><div class="stat-label">Filtered</div><div class="stat-value amber" id="statFiltered"></div><div class="stat-sub">bots &amp; self-opens</div></div>
-      <div class="stat-card"><div class="stat-label">First Open</div><div class="stat-value blue" style="font-size:1rem" id="statFirst"></div><div class="stat-sub" id="statFirstSub"></div></div>
-      <div class="stat-card"><div class="stat-label">Last Open</div><div class="stat-value blue" style="font-size:1rem" id="statLast"></div><div class="stat-sub" id="statLastSub"></div></div>
-    </div>
+      .time-grid { display: flex; flex-direction: column; gap: 10px; }
+      .time-row-label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; letter-spacing: 0.04em; }
+      .time-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+      .time-cell { aspect-ratio: 1; border-radius: var(--radius-btn); background: var(--bg-hover); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: default; transition: transform 0.15s ease, box-shadow 0.15s ease; position: relative; }
+      .time-cell:hover { transform: scale(1.15); z-index: 2; box-shadow: 0 0 12px rgba(0,0,0,0.5); }
+      .time-cell .tc-hour { font-size: 8px; color: var(--text-muted); font-weight: 500; line-height: 1; }
+      .time-cell .tc-count { font-size: 10px; font-weight: 700; color: var(--text-primary); line-height: 1; margin-top: 2px; }
+      .time-cell.t0 { background: var(--bg-hover); }
+      .time-cell.t0 .tc-count { color: var(--text-muted); }
+      .time-cell.t1 { background: rgba(59,130,246,0.2); }
+      .time-cell.t2 { background: rgba(59,130,246,0.4); }
+      .time-cell.t3 { background: rgba(59,130,246,0.6); }
+      .time-cell.t4 { background: rgba(59,130,246,0.85); }
+      .time-cell.peak { background: var(--success); }
+      .time-cell.peak .tc-hour { color: rgba(0,0,0,0.5); }
+      .time-cell.peak .tc-count { color: #fff; }
+      .time-peak-info { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+      .time-peak-info .tpi-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--success); flex-shrink: 0; }
+      .time-peak-info .tpi-text { font-size: 11px; color: var(--text-secondary); }
 
-    <div class="two-col">
-      <div class="panel"><div class="panel-header"><span class="panel-title">Open Activity</span><span class="panel-hint" id="calRange"></span></div><div class="panel-body"><div class="cal-wrap" id="calWrap"></div><div class="cal-legend" id="calLegend"></div></div></div>
-      <div class="panel"><div class="panel-header"><span class="panel-title">Peak Hours</span><span class="panel-hint">local time</span></div><div class="panel-body"><div class="time-grid" id="timeGrid"></div></div></div>
-    </div>
+      .event-row .event-dot.open { background: var(--accent); }
+      .event-row .event-dot.filtered { background: var(--warning); }
 
-    <div class="panel">
-      <div class="panel-header"><span class="panel-title">Event Timeline</span><div class="tabs"><button class="tab active" id="tabOpens">Opens</button><button class="tab" id="tabFiltered">Filtered</button></div></div>
-      <div class="panel-body"><div id="opensTab" class="timeline"></div><div id="filteredTab" class="timeline" style="display:none"></div></div>
-    </div>
-  </div>
+      .detail-event-list .event-row:nth-child(even) {
+        background: rgba(148,163,184,0.03);
+        border-radius: var(--radius-btn);
+      }
 
-  <script>
+      .snippet-box {
+        transition: background 0.2s ease;
+      }
+      .snippet-box.copied-flash {
+        background: rgba(34,197,94,0.15);
+      }
+
+      @media (max-width: 900px) {
+        .two-col { flex-direction: column; }
+      }
+      @media (max-width: 768px) {
+        .stat-grid { flex-wrap: wrap; }
+        .stat-grid .stat-card { min-width: calc(50% - 8px); }
+      }
+      @media (max-width: 480px) {
+        .stat-grid .stat-card { min-width: 100%; }
+      }
+    </style>`;
+
+  // -- Client-side scripts --
+  const scripts = `
     var DATA = {
-      id: ${JSON.stringify(id)},
-      recipient: ${JSON.stringify(recipient)},
-      subject: ${JSON.stringify(data.subject || '')},
-      opens: ${JSON.stringify(data.opens || 0)},
-      skipped: ${JSON.stringify(data.skipped || 0)},
-      hasSenderIp: ${JSON.stringify(!!data.senderIp)},
-      createdAt: ${JSON.stringify(data.createdAt || null)},
-      firstOpen: ${JSON.stringify(firstOpen)},
-      lastOpen: ${JSON.stringify(lastOpenTime)},
-      uniqueIps: ${JSON.stringify(uniqueIps)},
-      events: ${JSON.stringify(events)},
-      filtered: ${JSON.stringify(filteredEvents)},
-      dailyOpens: {}
+      id: ${safeJson(id)},
+      recipient: ${safeJson(recipient)},
+      subject: ${safeJson(data.subject || '')},
+      opens: ${safeJson(data.opens || 0)},
+      skipped: ${safeJson(data.skipped || 0)},
+      hasSenderIp: ${safeJson(!!data.senderIp)},
+      createdAt: ${safeJson(data.createdAt || null)},
+      firstOpen: ${safeJson(firstOpen)},
+      lastOpen: ${safeJson(lastOpenTime)},
+      uniqueIps: ${safeJson(uniqueIps)},
+      events: ${safeJson(events)},
+      filtered: ${safeJson(filteredEvents)},
+      sequenceId: ${safeJson(sequenceInfo ? sequenceInfo.id : null)}
     };
 
-    function formatTime(iso) { return new Date(iso).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, month: 'short', day: 'numeric', year: 'numeric' }); }
-    function shortDate(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-    function shortTime(iso) { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); }
-    function relativeTime(iso) { var diff = Date.now() - new Date(iso).getTime(); var mins = Math.floor(diff / 60000); if (mins < 1) return 'just now'; if (mins < 60) return mins + 'm ago'; var hrs = Math.floor(mins / 60); if (hrs < 24) return hrs + 'h ago'; var days = Math.floor(hrs / 24); if (days < 30) return days + 'd ago'; return formatTime(iso); }
+    function formatTime(iso) {
+      return new Date(iso).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function shortDate(iso) {
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    function shortTime(iso) {
+      return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+    function relativeTime(iso) {
+      var diff = Date.now() - new Date(iso).getTime();
+      var mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return mins + 'm ago';
+      var hrs = Math.floor(mins / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      var days = Math.floor(hrs / 24);
+      if (days < 30) return days + 'd ago';
+      return formatTime(iso);
+    }
 
-    // Header
-    document.getElementById('navRecipient').textContent = DATA.recipient;
-    document.getElementById('pageTitle').textContent = DATA.subject || DATA.recipient;
-    if (DATA.subject) { var metaR = document.getElementById('metaRecipient'); metaR.style.display = ''; metaR.textContent = DATA.recipient; }
-    document.getElementById('metaCreated').textContent = 'Created ' + (DATA.createdAt ? new Date(DATA.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'unknown');
-    var copyBtn = document.getElementById('copyBtn');
-    copyBtn.textContent = DATA.id;
-    copyBtn.addEventListener('click', function() { navigator.clipboard.writeText(DATA.id).then(function() { copyBtn.textContent = 'Copied!'; setTimeout(function() { copyBtn.textContent = DATA.id; }, 1500); }); });
+    // Populate date-dependent stat values client-side
+    var statFirst = document.getElementById('statFirst');
+    if (statFirst) statFirst.textContent = shortDate(DATA.firstOpen);
+    var statFirstSub = document.getElementById('statFirstSub');
+    if (statFirstSub) statFirstSub.textContent = shortTime(DATA.firstOpen);
+    var statLast = document.getElementById('statLast');
+    if (statLast) statLast.textContent = shortDate(DATA.lastOpen);
+    var statLastSub = document.getElementById('statLastSub');
+    if (statLastSub) statLastSub.textContent = shortTime(DATA.lastOpen);
 
-    var badge = document.getElementById('statusBadge');
-    badge.className = 'badge ' + (DATA.opens > 0 ? 'badge-green' : 'badge-amber');
-    badge.textContent = DATA.opens > 0 ? 'Opened' : 'Pending';
+    // Delete button
+    document.getElementById('deleteBtn').addEventListener('click', function() {
+      if (confirm('Delete this tracker?')) {
+        fetch('/d/' + DATA.id)
+          .then(function(res) {
+            if (!res.ok) throw new Error('Request failed');
+            location.href = '/';
+          })
+          .catch(function(err) {
+            alert('Error: ' + err.message);
+          });
+      }
+    });
 
-    document.getElementById('deleteBtn').addEventListener('click', function() { if (confirm('Delete this tracker?')) fetch('/d/' + DATA.id).then(function() { location.href = '/'; }); });
-    if (DATA.hasSenderIp) document.getElementById('protectionBanner').style.display = '';
+    // Sequence action buttons
+    var cancelSeqBtn = document.getElementById('cancelSeqBtn');
+    if (cancelSeqBtn) {
+      cancelSeqBtn.addEventListener('click', function() {
+        if (confirm('Cancel sequence?')) {
+          fetch('/sequences/' + DATA.sequenceId, { method: 'DELETE' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Request failed');
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('Error: ' + err.message);
+            });
+        }
+      });
+    }
+    var skipStepBtn = document.getElementById('skipStepBtn');
+    if (skipStepBtn) {
+      skipStepBtn.addEventListener('click', function() {
+        if (confirm('Skip current step?')) {
+          fetch('/sequences/' + DATA.sequenceId + '/skip', { method: 'POST' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Request failed');
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('Error: ' + err.message);
+            });
+        }
+      });
+    }
 
-    // Stats
-    document.getElementById('statOpens').textContent = DATA.opens;
-    document.getElementById('statViewers').textContent = DATA.uniqueIps + ' unique ' + (DATA.uniqueIps === 1 ? 'viewer' : 'viewers');
-    document.getElementById('statFiltered').textContent = DATA.skipped;
-    document.getElementById('statFirst').textContent = DATA.firstOpen ? shortDate(DATA.firstOpen) : '\\u2014';
-    document.getElementById('statFirstSub').textContent = DATA.firstOpen ? shortTime(DATA.firstOpen) : 'not yet';
-    document.getElementById('statLast').textContent = DATA.lastOpen ? shortDate(DATA.lastOpen) : '\\u2014';
-    document.getElementById('statLastSub').textContent = DATA.lastOpen ? shortTime(DATA.lastOpen) : 'not yet';
+    // Pixel snippet (click to copy)
+    var base = location.origin;
+    var pixelHtmlStr = '<img src="' + base + '/t/' + DATA.id + '" width="1" height="1" style="display:none" />';
+    var pixelUrlStr = base + '/t/' + DATA.id;
+    var snippetHtml = document.getElementById('snippetHtml');
+    function flashCopied(el, originalText) {
+      navigator.clipboard.writeText(originalText).then(function() {
+        el.textContent = 'Copied!';
+        el.classList.add('copied-flash');
+        setTimeout(function() {
+          el.textContent = originalText;
+          el.classList.remove('copied-flash');
+        }, 1500);
+      });
+    }
+
+    snippetHtml.textContent = pixelHtmlStr;
+    snippetHtml.addEventListener('click', function() { flashCopied(snippetHtml, pixelHtmlStr); });
+    var snippetUrl = document.getElementById('snippetUrl');
+    snippetUrl.textContent = pixelUrlStr;
+    snippetUrl.addEventListener('click', function() { flashCopied(snippetUrl, pixelUrlStr); });
 
     // Peak Hours (local timezone)
     var localHourly = new Array(24).fill(0);
@@ -285,9 +413,9 @@ export function renderDetail(id, data) {
     calWrap.appendChild(monthsRow); calWrap.appendChild(grid);
 
     var legend = document.getElementById('calLegend');
-    var ls = document.createElement('span'); ls.textContent = 'Less'; legend.appendChild(ls);
+    var ls = document.createElement('span'); ls.textContent = 'Less'; ls.style.cssText = 'font-size:9px;color:var(--text-muted);'; legend.appendChild(ls);
     ['', 'l1', 'l2', 'l3', 'l4'].forEach(function(cls) { var b = document.createElement('div'); b.className = 'cal-legend-cell cal-cell' + (cls ? ' ' + cls : ''); legend.appendChild(b); });
-    var ms = document.createElement('span'); ms.textContent = 'More'; legend.appendChild(ms);
+    var ms = document.createElement('span'); ms.textContent = 'More'; ms.style.cssText = 'font-size:9px;color:var(--text-muted);'; legend.appendChild(ms);
 
     calWrap.addEventListener('mouseover', function(e) {
       if (e.target.classList.contains('cal-cell') && e.target.getAttribute('data-date')) {
@@ -307,30 +435,113 @@ export function renderDetail(id, data) {
     function showTab(tab) {
       document.getElementById('opensTab').style.display = tab === 'opens' ? '' : 'none';
       document.getElementById('filteredTab').style.display = tab === 'filtered' ? '' : 'none';
-      document.getElementById('tabOpens').className = 'tab' + (tab === 'opens' ? ' active' : '');
-      document.getElementById('tabFiltered').className = 'tab' + (tab === 'filtered' ? ' active' : '');
+      document.getElementById('tabOpens').className = 'filter-tab' + (tab === 'opens' ? ' active' : '');
+      document.getElementById('tabFiltered').className = 'filter-tab' + (tab === 'filtered' ? ' active' : '');
     }
 
     function buildTimelineItem(e, isFiltered, idx) {
-      var item = document.createElement('div'); item.className = 'tl-item'; item.style.animationDelay = (idx * 0.04) + 's';
-      var dot = document.createElement('div'); dot.className = 'tl-dot' + (isFiltered ? ' filtered' : '');
-      var content = document.createElement('div'); content.className = 'tl-content';
-      var timeRow = document.createElement('div'); timeRow.className = 'tl-time'; timeRow.textContent = relativeTime(e.time) + ' ';
-      var timeFull = document.createElement('span'); timeFull.className = 'tl-time-full'; timeFull.textContent = '\\u2014 ' + formatTime(e.time); timeRow.appendChild(timeFull);
-      var details = document.createElement('div'); details.className = 'tl-details';
-      if (isFiltered) { var rs = document.createElement('span'); rs.className = 'tl-reason'; rs.textContent = e.reason === 'sender_ip' ? 'Self-open' : 'Bot / Proxy'; details.appendChild(rs); }
-      else { var ct = document.createElement('span'); ct.className = 'tl-tag'; ct.textContent = e.country || '?'; details.appendChild(ct); }
-      var ip = document.createElement('span'); ip.className = 'tl-tag'; ip.textContent = e.ip; details.appendChild(ip);
-      content.appendChild(timeRow); content.appendChild(details); item.appendChild(dot); item.appendChild(content); return item;
+      var item = document.createElement('div'); item.className = 'event-row'; item.style.animationDelay = (idx * 0.04) + 's';
+      var evDot = document.createElement('div'); evDot.className = 'event-dot ' + (isFiltered ? 'filtered' : 'open');
+      var content = document.createElement('div'); content.className = 'event-text'; content.style.cssText = 'flex:1;min-width:0;';
+      var timeStr = document.createElement('strong'); timeStr.textContent = relativeTime(e.time);
+      var timeFull = document.createElement('em'); timeFull.textContent = ' \\u2014 ' + formatTime(e.time);
+      content.appendChild(timeStr); content.appendChild(timeFull);
+      if (isFiltered) {
+        var reason = document.createElement('div'); reason.style.cssText = 'font-size:11px;color:var(--warning);font-weight:500;margin-top:2px;';
+        reason.textContent = e.reason === 'sender_ip' ? 'Self-open' : 'Bot / Proxy';
+        content.appendChild(reason);
+        // Show location + ISP for filtered events if available
+        var filtLoc = buildLocationString(e);
+        if (filtLoc) {
+          var filtLocDiv = document.createElement('div'); filtLocDiv.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:1px;';
+          filtLocDiv.textContent = filtLoc;
+          content.appendChild(filtLocDiv);
+        }
+        if (e.ip) {
+          var filtIp = document.createElement('div'); filtIp.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:1px;';
+          filtIp.textContent = e.ip;
+          content.appendChild(filtIp);
+        }
+      } else {
+        // Line 2: Location + Device
+        var locParts = [];
+        if (e.city && e.city !== 'unknown') locParts.push(e.city);
+        if (e.region && e.region !== 'unknown') locParts.push(e.region);
+        if (e.country && e.country !== 'unknown') locParts.push(e.country);
+        var locStr = locParts.join(', ');
+
+        var devStr = '';
+        if (e.browser && e.browser !== 'Unknown') {
+          devStr = e.browser;
+          if (e.os && e.os !== 'Unknown') devStr += ' on ' + e.os;
+          if (e.device && e.device !== 'Desktop') devStr += ' (' + e.device + ')';
+        }
+
+        var line2Parts = [locStr, devStr].filter(Boolean);
+        if (line2Parts.length > 0) {
+          var line2 = document.createElement('div'); line2.style.cssText = 'font-size:11px;color:var(--text-secondary);margin-top:2px;';
+          line2.textContent = line2Parts.join(' \\u00b7 ');
+          content.appendChild(line2);
+        } else if (e.country && e.country !== 'unknown') {
+          // Fallback for older events with only country
+          var countryDiv = document.createElement('div'); countryDiv.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;';
+          countryDiv.textContent = e.country;
+          content.appendChild(countryDiv);
+        }
+
+        // Line 3: ISP + IP (muted)
+        var line3Parts = [];
+        if (e.isp && e.isp !== 'unknown') line3Parts.push(e.isp);
+        if (e.ip) line3Parts.push(e.ip);
+        if (line3Parts.length > 0) {
+          var line3 = document.createElement('div'); line3.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:1px;';
+          line3.textContent = line3Parts.join(' \\u00b7 ');
+          content.appendChild(line3);
+        }
+      }
+      item.appendChild(evDot); item.appendChild(content);
+      return item;
+    }
+
+    function buildLocationString(e) {
+      var parts = [];
+      if (e.city && e.city !== 'unknown') parts.push(e.city);
+      if (e.region && e.region !== 'unknown') parts.push(e.region);
+      if (e.isp && e.isp !== 'unknown') {
+        if (parts.length > 0) return parts.join(', ') + ' \\u00b7 ' + e.isp;
+        return e.isp;
+      }
+      return parts.join(', ');
     }
 
     var opensTab = document.getElementById('opensTab');
-    if (DATA.events.length === 0) { var ee = document.createElement('div'); ee.className = 'empty-state'; var ep = document.createElement('p'); ep.textContent = 'No opens recorded yet'; ee.appendChild(ep); opensTab.appendChild(ee); }
-    else { DATA.events.slice().reverse().slice(0, 30).forEach(function(e, i) { opensTab.appendChild(buildTimelineItem(e, false, i)); }); }
+    if (DATA.events.length === 0) {
+      var ee = document.createElement('div'); ee.className = 'empty-state';
+      var eep = document.createElement('p'); eep.textContent = 'No opens recorded yet';
+      ee.appendChild(eep); opensTab.appendChild(ee);
+    } else {
+      DATA.events.slice().reverse().slice(0, 30).forEach(function(e, i) { opensTab.appendChild(buildTimelineItem(e, false, i)); });
+    }
 
     var filteredTab = document.getElementById('filteredTab');
-    if (DATA.filtered.length === 0) { var ef = document.createElement('div'); ef.className = 'empty-state'; var fp = document.createElement('p'); fp.textContent = 'No filtered events'; ef.appendChild(fp); filteredTab.appendChild(ef); }
-    else { DATA.filtered.slice().reverse().slice(0, 20).forEach(function(e, i) { filteredTab.appendChild(buildTimelineItem(e, true, i)); }); }
-  </script>
-</body></html>`;
+    if (DATA.filtered.length === 0) {
+      var ef = document.createElement('div'); ef.className = 'empty-state';
+      var efp = document.createElement('p'); efp.textContent = 'No filtered events';
+      ef.appendChild(efp); filteredTab.appendChild(ef);
+    } else {
+      DATA.filtered.slice().reverse().slice(0, 20).forEach(function(e, i) { filteredTab.appendChild(buildTimelineItem(e, true, i)); });
+    }
+  `;
+
+  const subtitle = data.subject ? esc(data.subject) : '';
+
+  return detailStyles + renderLayout({
+    title: esc(recipient),
+    subtitle,
+    activePage: 'dashboard',
+    headerActions,
+    bodyHtml,
+    scripts,
+    oauthConnected,
+  });
 }
