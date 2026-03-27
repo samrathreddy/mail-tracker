@@ -790,14 +790,38 @@
   }
 
   // Spam checker word lists
-  var SPAM_RED = ['free', 'buy now', 'act now', 'limited time', 'click here',
-    'no obligation', 'risk-free', 'winner', 'congratulations', 'urgent', '100%',
-    'guarantee', 'earn money', 'make money', 'cash', 'credit', 'discount', 'deal',
-    'lowest price', 'order now', 'subscribe', 'no cost'];
-  var SPAM_ORANGE = ['opportunity', 'amazing', 'incredible', 'exclusive',
-    'special', 'bonus', 'profit', 'income', 'investment', 'affordable'];
-  var SPAM_YELLOW = ['reminder', 'help', 'improve', 'solution', 'results',
-    'success', 'easy', 'simple', 'proven', 'effective'];
+  // Red: clearly spammy phrases — multi-word triggers that scream spam
+  var SPAM_RED = [
+    'buy now', 'act now', 'act fast', 'limited time offer', 'click here',
+    'no obligation', 'risk-free', 'congratulations', 'you have been selected',
+    'earn money', 'make money', 'earn cash', 'fast cash', 'double your',
+    'lowest price', 'order now', 'subscribe now', 'no cost', 'no catch',
+    '100% free', '100% guaranteed', 'money-back guarantee', 'free money',
+    'get rich', 'work from home', 'be your own boss', 'financial freedom',
+    'once in a lifetime', 'this isn\'t spam', 'not junk', 'as seen on',
+    'multi-level marketing', 'no credit check', 'no hidden fees',
+    'while supplies last', 'don\'t delete', 'apply now!', 'call now!',
+    'miracle', 'secret formula', 'lose weight fast', 'anti-aging',
+    'online casino', 'free chips', 'jackpot', 'lottery',
+  ];
+  // Orange: aggressive sales tactics — phrases that push too hard
+  var SPAM_ORANGE = [
+    'exclusive deal', 'special offer', 'limited time', 'act immediately',
+    'don\'t miss', 'expires today', 'final call', 'hurry',
+    'take action now', 'instant access', 'sign up free',
+    'free trial', 'free consultation', 'free gift', 'free preview',
+    'guaranteed results', 'incredible deal', 'unbelievable',
+    'pure profit', 'potential earnings', 'increase sales',
+    'no strings attached', 'cancel at any time',
+  ];
+  // Yellow: soft triggers — common words that are fine alone but worth noting
+  // These are individual words that Salesforge-style checkers flag lightly
+  var SPAM_YELLOW = [
+    'free', 'guarantee', 'urgent', 'winner', 'bonus', 'discount',
+    'profit', 'cash', 'earn', 'income', 'affordable', 'bargain',
+    'giveaway', 'prize', 'instant', 'amazing', 'incredible',
+    'millions', 'save', 'get', 'now', 'all',
+  ];
 
   function findSpamWords(text, wordList) {
     var found = [];

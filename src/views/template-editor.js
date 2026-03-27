@@ -1717,14 +1717,37 @@ function buildClientScripts(template) {
     var spamPanelOpen = false;
     var spamDebounceTimer = null;
 
-    var SPAM_WORDS_RED = ['free', 'buy now', 'act now', 'limited time', 'click here',
-      'no obligation', 'risk-free', 'winner', 'congratulations', 'urgent', '100%',
-      'guarantee', 'earn money', 'make money', 'cash', 'credit', 'discount', 'deal',
-      'offer', 'lowest price', 'order now', 'subscribe', 'no cost'];
-    var SPAM_WORDS_ORANGE = ['opportunity', 'amazing', 'incredible', 'exclusive',
-      'special', 'bonus', 'profit', 'income', 'investment', 'affordable'];
-    var SPAM_WORDS_YELLOW = ['reminder', 'help', 'improve', 'solution', 'results',
-      'success', 'easy', 'simple', 'proven', 'effective'];
+    // Red: clearly spammy multi-word phrases
+    var SPAM_WORDS_RED = [
+      'buy now', 'act now', 'act fast', 'limited time offer', 'click here',
+      'no obligation', 'risk-free', 'congratulations', 'you have been selected',
+      'earn money', 'make money', 'earn cash', 'fast cash', 'double your',
+      'lowest price', 'order now', 'subscribe now', 'no cost', 'no catch',
+      '100% free', '100% guaranteed', 'money-back guarantee', 'free money',
+      'get rich', 'work from home', 'be your own boss', 'financial freedom',
+      'once in a lifetime', 'this isn\\'t spam', 'not junk', 'as seen on',
+      'multi-level marketing', 'no credit check', 'no hidden fees',
+      'while supplies last', 'don\\'t delete', 'apply now!', 'call now!',
+      'miracle', 'secret formula', 'lose weight fast', 'anti-aging',
+      'online casino', 'free chips', 'jackpot', 'lottery',
+    ];
+    // Orange: aggressive sales tactics
+    var SPAM_WORDS_ORANGE = [
+      'exclusive deal', 'special offer', 'limited time', 'act immediately',
+      'don\\'t miss', 'expires today', 'final call', 'hurry',
+      'take action now', 'instant access', 'sign up free',
+      'free trial', 'free consultation', 'free gift', 'free preview',
+      'guaranteed results', 'incredible deal', 'unbelievable',
+      'pure profit', 'potential earnings', 'increase sales',
+      'no strings attached', 'cancel at any time',
+    ];
+    // Yellow: soft single-word triggers (fine alone, worth noting)
+    var SPAM_WORDS_YELLOW = [
+      'free', 'guarantee', 'urgent', 'winner', 'bonus', 'discount',
+      'profit', 'cash', 'earn', 'income', 'affordable', 'bargain',
+      'giveaway', 'prize', 'instant', 'amazing', 'incredible',
+      'millions', 'save', 'get', 'now', 'all',
+    ];
 
     function toggleSpamPanel() {
       spamPanelOpen = !spamPanelOpen;
@@ -1798,11 +1821,14 @@ function buildClientScripts(template) {
       score += redFound.length * 10;
       score += orangeFound.length * 5;
       score += yellowFound.length * 2;
-      score += Math.max(0, linkCount * 15);
+      // Links: first link free, 2nd = 5pts, 3+ = 10pts each
+      if (linkCount >= 3) score += 10 + (linkCount - 2) * 10;
+      else if (linkCount === 2) score += 5;
       score += Math.max(0, imageCount * 10);
       score += Math.max(0, (emojiCount - 1) * 5);
-      if (wordCount < 25 || wordCount > 100) score += 10;
-      if (spintaxPercent < 5) score += 10;
+      if (wordCount < 15 || wordCount > 150) score += 10;
+      else if (wordCount < 25 || wordCount > 100) score += 5;
+      if (spintaxPercent < 5 && wordCount > 10) score += 10;
       score = Math.min(100, score);
 
       return {
