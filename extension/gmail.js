@@ -411,14 +411,23 @@
       return;
     }
 
+    // Per-compose tracking override: skip pixel injection but still allow sequences
+    var trackingDisabledForCompose = form.hasAttribute('data-tracking-disabled');
+
     const recipients = getRecipients(form);
     if (recipients.length === 0) return;
 
-    const untracked = getUntrackedRecipients(bodyEl, recipients);
-    if (untracked.length === 0) return;
-
-    console.log(LOG, 'Found untracked recipients:', untracked);
-    await injectTracker(bodyEl, untracked);
+    if (!trackingDisabledForCompose) {
+      const untracked = getUntrackedRecipients(bodyEl, recipients);
+      if (untracked.length === 0) {
+        // All tracked, fall through to sequence logic
+      } else {
+        console.log(LOG, 'Found untracked recipients:', untracked);
+        await injectTracker(bodyEl, untracked);
+      }
+    } else {
+      console.log(LOG, 'Tracking disabled for this compose, skipping pixel injection');
+    }
 
     // Create sequence if one was selected (but NOT if a scheduled send is pending)
     // Search within form first, then the whole compose dialog (button may be in toolbar)
@@ -570,9 +579,15 @@
           const form = findComposeForm(body);
           if (!form) continue;
 
+          // Skip pixel injection if tracking disabled for this compose
+          if (form.hasAttribute('data-tracking-disabled')) {
+            console.log(LOG, 'Tracking disabled for this compose, skipping pixel injection');
+            continue;
+          }
+
           const recipients = getRecipients(form);
           const untracked = getUntrackedRecipients(body, recipients);
-          
+
           if (untracked.length > 0) {
             console.log(LOG, 'Injecting pixels for untracked recipients:', untracked);
             await processCompose(body);
@@ -1435,6 +1450,212 @@
     setTimeout(function() { document.addEventListener('click', closeOutside, true); }, 0);
   }
 
+  // --- Compose Status Bar ---
+  function createComposeStatusBar(composeForm) {
+    var bar = document.createElement('div');
+    bar.setAttribute('data-compose-status-bar', 'true');
+    bar.style.cssText = 'background:#f8f9fa;border-top:1px solid #e2e5e9;border-bottom:1px solid #e2e5e9;padding:4px 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-family:Google Sans,Roboto,sans-serif;';
+
+    // Left side: tracking toggle
+    var leftSide = document.createElement('div');
+    leftSide.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;';
+    leftSide.setAttribute('data-status-tracking', 'true');
+
+    var trackDot = document.createElement('span');
+    trackDot.setAttribute('data-track-dot', 'true');
+    trackDot.style.cssText = 'width:6px;height:6px;border-radius:50%;flex-shrink:0;';
+
+    var trackLabel = document.createElement('span');
+    trackLabel.setAttribute('data-track-label', 'true');
+    trackLabel.style.cssText = 'color:#374151;user-select:none;';
+
+    // Toggle switch
+    var toggleTrack = document.createElement('div');
+    toggleTrack.setAttribute('data-track-toggle', 'true');
+    toggleTrack.style.cssText = 'width:28px;height:16px;border-radius:8px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;';
+
+    var toggleThumb = document.createElement('div');
+    toggleThumb.style.cssText = 'width:12px;height:12px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.2);';
+    toggleTrack.appendChild(toggleThumb);
+
+    function applyTrackingVisuals(isOn) {
+      if (isOn) {
+        trackDot.style.background = '#22c55e';
+        trackLabel.textContent = 'Tracking';
+        toggleTrack.style.background = '#22c55e';
+        toggleThumb.style.left = '14px';
+      } else {
+        trackDot.style.background = '#9ca3af';
+        trackLabel.textContent = 'Tracking off';
+        toggleTrack.style.background = '#d1d5db';
+        toggleThumb.style.left = '2px';
+      }
+    }
+
+    // Determine initial state: per-compose override or global
+    var isTrackingOn = !composeForm.hasAttribute('data-tracking-disabled') && trackingEnabled;
+    applyTrackingVisuals(isTrackingOn);
+
+    function handleToggle(ev) {
+      ev.stopPropagation();
+      var currentlyOn = !composeForm.hasAttribute('data-tracking-disabled') && trackingEnabled;
+      if (currentlyOn) {
+        // Turn off for THIS compose
+        composeForm.setAttribute('data-tracking-disabled', 'true');
+        applyTrackingVisuals(false);
+      } else {
+        // Turn on: remove per-compose override, ensure global is on
+        composeForm.removeAttribute('data-tracking-disabled');
+        trackingEnabled = true;
+        chrome.storage.sync.set({ autoTrack: true });
+        applyTrackingVisuals(true);
+      }
+    }
+
+    leftSide.addEventListener('click', handleToggle);
+    leftSide.appendChild(trackDot);
+    leftSide.appendChild(trackLabel);
+    leftSide.appendChild(toggleTrack);
+
+    // Right side: sequence status
+    var rightSide = document.createElement('div');
+    rightSide.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    rightSide.setAttribute('data-status-sequence', 'true');
+
+    var seqDot = document.createElement('span');
+    seqDot.setAttribute('data-seq-dot', 'true');
+    seqDot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0;';
+
+    var seqLabel = document.createElement('span');
+    seqLabel.setAttribute('data-seq-label', 'true');
+    seqLabel.style.cssText = 'color:#6b7280;user-select:none;';
+    seqLabel.textContent = 'No sequence';
+
+    var seqClear = document.createElement('span');
+    seqClear.setAttribute('data-seq-clear', 'true');
+    seqClear.style.cssText = 'color:#9ca3af;cursor:pointer;font-size:14px;line-height:1;display:none;padding:0 2px;';
+    seqClear.textContent = '\u00d7';
+    seqClear.addEventListener('mouseenter', function() { seqClear.style.color = '#ef4444'; });
+    seqClear.addEventListener('mouseleave', function() { seqClear.style.color = '#9ca3af'; });
+
+    rightSide.appendChild(seqDot);
+    rightSide.appendChild(seqLabel);
+    rightSide.appendChild(seqClear);
+
+    bar.appendChild(leftSide);
+    bar.appendChild(rightSide);
+
+    // Store refs for easy updates
+    bar._applyTrackingVisuals = applyTrackingVisuals;
+
+    return bar;
+  }
+
+  function updateComposeStatusBar(composeForm) {
+    var bar = composeForm.querySelector('[data-compose-status-bar]');
+    if (!bar) return;
+
+    // Update tracking visuals
+    var isTrackingOn = !composeForm.hasAttribute('data-tracking-disabled') && trackingEnabled;
+    if (bar._applyTrackingVisuals) bar._applyTrackingVisuals(isTrackingOn);
+
+    // Find the sequence button
+    var seqBtn = composeForm.querySelector('[data-sequence-selector] button') ||
+      (composeForm.closest('[role="dialog"]') || composeForm).querySelector('[data-sequence-selector] button');
+
+    var seqDot = bar.querySelector('[data-seq-dot]');
+    var seqLabel = bar.querySelector('[data-seq-label]');
+    var seqClear = bar.querySelector('[data-seq-clear]');
+    if (!seqDot || !seqLabel || !seqClear) return;
+
+    var templateId = seqBtn ? seqBtn.getAttribute('data-selected-template') : '';
+    var oneoffSteps = seqBtn ? seqBtn.getAttribute('data-oneoff-steps') : '';
+    var scheduledAt = seqBtn ? seqBtn.getAttribute('data-scheduled-at') : '';
+
+    // Remove old clear handler and set new one
+    var newClear = seqClear.cloneNode(true);
+    newClear.addEventListener('mouseenter', function() { newClear.style.color = '#ef4444'; });
+    newClear.addEventListener('mouseleave', function() { newClear.style.color = '#9ca3af'; });
+    seqClear.parentNode.replaceChild(newClear, seqClear);
+    seqClear = newClear;
+
+    if (scheduledAt) {
+      // Show scheduled send info
+      seqDot.style.background = '#3b82f6';
+      var schedTz = seqBtn.getAttribute('data-scheduled-tz') || seqBtn.getAttribute('data-recipient-timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+      seqLabel.textContent = formatScheduleLabel(scheduledAt, schedTz);
+      seqLabel.style.color = '#3b82f6';
+      seqLabel.style.fontWeight = '500';
+      seqClear.style.display = 'inline';
+      seqClear.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        if (seqBtn) {
+          seqBtn.removeAttribute('data-scheduled-at');
+          seqBtn.removeAttribute('data-recipient-timezone');
+          seqBtn.removeAttribute('data-timezone-source');
+          seqBtn.removeAttribute('data-scheduled-tz');
+          var svg = seqBtn.querySelector('svg');
+          var hasSeq = seqBtn.getAttribute('data-selected-template') || seqBtn.getAttribute('data-oneoff-steps');
+          setSequenceBtnState(seqBtn, svg, !!hasSeq, hasSeq ? seqBtn.title : 'Select sequence');
+        }
+        updateComposeStatusBar(composeForm);
+      });
+    } else if (templateId) {
+      seqDot.style.background = '#3b82f6';
+      seqLabel.textContent = seqBtn.title || 'Template selected';
+      seqLabel.style.color = '#3b82f6';
+      seqLabel.style.fontWeight = '500';
+      seqClear.style.display = 'inline';
+      seqClear.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        if (seqBtn) {
+          seqBtn.setAttribute('data-selected-template', '');
+          seqBtn.setAttribute('data-oneoff-steps', '');
+          var svg = seqBtn.querySelector('svg');
+          setSequenceBtnState(seqBtn, svg, false, 'Select sequence');
+        }
+        updateComposeStatusBar(composeForm);
+      });
+    } else if (oneoffSteps) {
+      var steps = [];
+      try { steps = JSON.parse(oneoffSteps); } catch (_e) { /* ignore */ }
+      var stepCount = steps.length;
+      var totalDays = 0;
+      for (var i = 0; i < steps.length; i++) totalDays += (steps[i].delayDays || 0);
+      seqDot.style.background = '#3b82f6';
+      seqLabel.textContent = 'One-off (' + stepCount + ' step' + (stepCount > 1 ? 's' : '') + ', ' + totalDays + 'd)';
+      seqLabel.style.color = '#3b82f6';
+      seqLabel.style.fontWeight = '500';
+      seqClear.style.display = 'inline';
+      seqClear.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        if (seqBtn) {
+          seqBtn.setAttribute('data-selected-template', '');
+          seqBtn.setAttribute('data-oneoff-steps', '');
+          var svg = seqBtn.querySelector('svg');
+          setSequenceBtnState(seqBtn, svg, false, 'Select sequence');
+        }
+        updateComposeStatusBar(composeForm);
+      });
+    } else {
+      seqDot.style.background = '#9ca3af';
+      seqLabel.textContent = 'No sequence';
+      seqLabel.style.color = '#6b7280';
+      seqLabel.style.fontWeight = 'normal';
+      seqClear.style.display = 'none';
+    }
+
+    // Make sequence label clickable to open dropdown
+    seqLabel.style.cursor = 'pointer';
+    var newLabel = seqLabel.cloneNode(true);
+    newLabel.style.cursor = 'pointer';
+    newLabel.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      if (seqBtn) seqBtn.click();
+    });
+    seqLabel.parentNode.replaceChild(newLabel, seqLabel);
+  }
+
   function injectSequenceSelector(composeForm) {
     if (!composeForm || composeForm.querySelector('[data-sequence-selector]')) return;
 
@@ -1623,6 +1844,7 @@
         btn.setAttribute('data-timezone-source', 'manual');
         dropdown.style.display = 'none';
         showToast('Click Send to schedule for ' + formatScheduleLabel(corrected.toISOString(), selectedTz));
+        updateComposeStatusBar(composeForm);
       });
       pickPanel.appendChild(pickConfirm);
       dropdown.appendChild(pickPanel);
@@ -1668,6 +1890,7 @@
         btn.setAttribute('data-timezone-source', schedInfo && schedInfo.timezoneSource ? schedInfo.timezoneSource : '');
         dropdown.style.display = 'none';
         showToast('Click Send to schedule for ' + formatScheduleLabel(schedIso, schedTz));
+        updateComposeStatusBar(composeForm);
       });
 
       const sendNowRow = document.createElement('div');
@@ -1681,6 +1904,7 @@
         btn.removeAttribute('data-recipient-timezone');
         btn.removeAttribute('data-timezone-source');
         dropdown.style.display = 'none';
+        updateComposeStatusBar(composeForm);
       });
       dropdown.appendChild(sendNowRow);
 
@@ -1699,6 +1923,7 @@
         btn.removeAttribute('data-timezone-source');
         setSequenceBtnState(btn, svg, false, 'Select sequence');
         dropdown.style.display = 'none';
+        updateComposeStatusBar(composeForm);
       });
       noSeq.addEventListener('mouseenter', function() { noSeq.style.background = '#3f3f46'; });
       noSeq.addEventListener('mouseleave', function() { noSeq.style.background = 'none'; });
@@ -1723,6 +1948,7 @@
             btn.setAttribute('data-oneoff-steps', '');
             setSequenceBtnState(btn, svg, true, tmpl.name);
             dropdown.style.display = 'none';
+            updateComposeStatusBar(composeForm);
           });
           item.addEventListener('mouseenter', function() { item.style.background = '#3f3f46'; });
           item.addEventListener('mouseleave', function() { item.style.background = 'none'; });
@@ -1846,6 +2072,25 @@
     var spamTarget = container.parentElement;
     if (spamTarget) {
       spamTarget.appendChild(spamContainer);
+    }
+
+    // Inject compose status bar if not already present
+    if (!composeForm.querySelector('[data-compose-status-bar]')) {
+      var statusBar = createComposeStatusBar(composeForm);
+      var composeBody = composeForm.querySelector('[contenteditable="true"][aria-label*="Message"]') ||
+        composeForm.querySelector('[contenteditable="true"][role="textbox"]');
+      var toolbarRowBtC = composeForm.querySelector('tr.btC');
+      if (composeBody && toolbarRowBtC) {
+        toolbarRowBtC.parentElement.insertBefore(statusBar, toolbarRowBtC);
+      } else if (composeBody) {
+        // Fallback: insert after compose body's parent
+        var bodyParent = composeBody.closest('div[class]') || composeBody.parentElement;
+        if (bodyParent && bodyParent.parentElement) {
+          bodyParent.parentElement.insertBefore(statusBar, bodyParent.nextSibling);
+        }
+      }
+      // Initial update
+      updateComposeStatusBar(composeForm);
     }
   }
 
@@ -2141,6 +2386,8 @@
       btn.setAttribute('data-oneoff-steps', JSON.stringify(steps));
       setSequenceBtnState(btn, svgEl, true, 'One-off follow-up');
       builder.remove();
+      var builderForm = container.closest('[role="dialog"]') || container.closest('.nH') || container.closest('form');
+      if (builderForm) updateComposeStatusBar(builderForm);
     });
     btnRow.appendChild(saveBtn);
 
