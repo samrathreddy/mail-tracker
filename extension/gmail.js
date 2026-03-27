@@ -1069,9 +1069,14 @@
 
     var panel = buildSpamPanel(composeForm);
 
-    // Position above the anchor button
+    // Position above the anchor button, flip left if near right edge
     var rect = anchorEl.getBoundingClientRect();
-    panel.style.left = Math.max(8, rect.left) + 'px';
+    var panelWidth = 280;
+    var leftPos = rect.left;
+    if (leftPos + panelWidth > window.innerWidth - 16) {
+      leftPos = Math.max(8, rect.right - panelWidth);
+    }
+    panel.style.left = Math.max(8, leftPos) + 'px';
     panel.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
 
     document.body.appendChild(panel);
@@ -1378,7 +1383,12 @@
     panel.appendChild(close);
 
     var rect = anchorEl.getBoundingClientRect();
-    panel.style.left = Math.min(window.innerWidth - 320, Math.max(8, rect.left)) + 'px';
+    var intelWidth = 320;
+    var intelLeft = rect.left;
+    if (intelLeft + intelWidth > window.innerWidth - 16) {
+      intelLeft = Math.max(8, rect.right - intelWidth);
+    }
+    panel.style.left = Math.max(8, intelLeft) + 'px';
     panel.style.top = Math.min(window.innerHeight - 280, Math.max(8, rect.bottom + 8)) + 'px';
 
     document.body.appendChild(panel);
@@ -1453,7 +1463,7 @@
     btn.appendChild(svg);
 
     const dropdown = document.createElement('div');
-    dropdown.style.cssText = 'display:none;position:absolute;bottom:100%;left:0;background:#27272a;border:1px solid #52525b;border-radius:10px;padding:6px 0;min-width:220px;z-index:9999;margin-bottom:4px;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+    dropdown.style.cssText = 'display:none;position:absolute;bottom:100%;right:0;background:#27272a;border:1px solid #52525b;border-radius:10px;padding:6px 0;min-width:220px;z-index:9999;margin-bottom:4px;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
 
     btn.addEventListener('click', async function(e) {
       e.preventDefault();
